@@ -1,0 +1,74 @@
+# config options for Constant Bandwidth Server
+#
+# Copyright (c) 2024 Instituto Superior de Engenharia do Porto (ISEP)
+# SPDX-License-Identifier: Apache-2.0
+
+menu "Constant Bandwidth Server (CBS)"
+
+    config CBS
+        bool "Constant Bandwidth Server (CBS)"
+        depends on SCHED_DEADLINE
+        select INSTRUMENT_THREAD_SWITCHING
+        default n
+        help
+            Enables the Constant Bandwidth Server (CBS) to handle soft
+            real-time tasks. Depends on Earliest Deadline First (EDF)
+            to be selected (CONFIG_SCHED_DEADLINE=y).
+    
+    config CBS_LOG
+        bool "CBS event logs"
+        depends on CBS
+        select LOG
+        default n
+        help
+            Enables logging of Constant Bandwidth Server (CBS) events,
+            such as jobs being pushed to the server, budget consumpion
+            and CBS thread switching in/out of the CPU. This option
+            requires CONFIG_CBS to be included within the project.
+
+    if CBS
+    menu "CBS constants"
+
+        config CBS_THREAD_STACK_SIZE
+            int "CBS thread memory"
+            default 512
+            help
+                The amount of memory to be
+                allocated for the CBS thread.
+        
+        config CBS_QUEUE_LENGTH
+            int "CBS job queue length"
+            default 16
+            help
+                The highest number of jobs that can
+                be pushed to a CBS job queue at once.
+
+        config CBS_INITIAL_DELAY
+            int "CBS thread initial delay"
+            default 0
+            help
+                Scheduling delay for the CBS thread.
+        
+        config CBS_CONDITION_SHIFT_AMOUNT
+            int "CBS condition shift amount"
+            default 10
+            help
+                One of the key differences of CBS (compared to other
+                real-time servers) is that, every time a new job is
+                pushed to the queue, the server checks a certain
+                condition to know whether or not it should replenish
+                its own budget before serving the new job.
+                
+                The condition is a mathematical formula that depends
+                on the current state of the server and the arrival
+                instant of the newcoming job. Although it involves
+                dividing and may have negative numbers, The current
+                math is performed with unsigned integers to optimize
+                performance. To avoid losing too much precision, both
+                sides of the equation are multiplied by (2^shift) before
+                the division takes place, which is equivalent to a simple
+                left-shift operation in assembly.
+    endmenu
+    endif
+
+endmenu # Constant Bandwidth Server (CBS)

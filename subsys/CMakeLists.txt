@@ -26,6 +26,7 @@ add_subdirectory(portability)
 add_subdirectory(random)
 add_subdirectory(rtio)
 add_subdirectory(sd)
+add_subdirectory(server)        # ALEX adicionou isto
 add_subdirectory(stats)
 add_subdirectory(storage)
 add_subdirectory(task_wdt)
