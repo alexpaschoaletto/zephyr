@@ -2,6 +2,7 @@
 
 # Copyright (c) 2016-2017 Intel Corporation
 # Copyright (c) 2021 Nordic Semiconductor
+# Copyright (c) 2024 Instituto Superior de Engenharia do Porto (ISEP)
 # SPDX-License-Identifier: Apache-2.0
 
 menu "Subsystems and OS Services"
@@ -38,8 +39,7 @@ source "subsys/retention/Kconfig"
 source "subsys/rtio/Kconfig"
 source "subsys/sd/Kconfig"
 source "subsys/sensing/Kconfig"
-source "subsys/server/Kconfig"				# ALEX adicionou isto 
-source "subsys/server/cbs/Kconfig"			# ALEX adicionou isto 
+source "subsys/server/cbs/Kconfig" 
 source "subsys/settings/Kconfig"
 source "subsys/shell/Kconfig"
 source "subsys/sip_svc/Kconfig"

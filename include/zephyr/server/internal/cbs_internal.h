@@ -1,3 +1,8 @@
+/* 
+*  Copyright (c) 2024 Instituto Superior de Engenharia do Porto (ISEP)
+*  SPDX-License-Identifier: Apache-2.0
+*/
+
 #ifndef ZEPHYR_CBS_INTERNAL
 #define ZEPHYR_CBS_INTERNAL
 
