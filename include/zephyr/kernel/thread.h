@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016, Wind River Systems, Inc.
- *
+ * Copyright (c) 2024 Instituto Superior de Engenharia do Porto
  * SPDX-License-Identifier: Apache-2.0
  */
 

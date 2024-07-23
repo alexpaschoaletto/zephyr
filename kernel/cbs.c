@@ -1,3 +1,8 @@
+/* 
+*  Copyright (c) 2024 Instituto Superior de Engenharia do Porto (ISEP)
+*  SPDX-License-Identifier: Apache-2.0
+*/
+
 #include <kthread.h>
 #include <zephyr/server/internal/cbs_internal.h>
 #include <zephyr/server/cbs.h>
