@@ -164,9 +164,6 @@ void k_cbs_push_job(cbs_t *cbs, cbs_callback_t job_function, void *job_arg, k_ti
 
     #ifdef CONFIG_CBS_LOG
     cbs_trace(CBS_PUSH_JOB, cbs);
-    #endif
-
-    #ifdef CONFIG_CBS_LOG
     bool condition_met = cbs_budget_restore_on_condition(cbs);
     if(condition_met) cbs_trace(CBS_BUDGET_CONDITION_MET, cbs);
     #else
