@@ -68,6 +68,21 @@ menu "Constant Bandwidth Server (CBS)"
                 sides of the equation are multiplied by (2^shift) before
                 the division takes place, which is equivalent to a simple
                 left-shift operation in assembly.
+        
+        if CBS_LOG
+
+        config CBS_THREAD_MAX_NAME_LEN
+            int "Max length of the CBS thread name"
+            default 20
+            help
+                CBS thread names are the same as the variables created with
+                K_CBS_DEFINE and get stored in the cbs_t struct. This option
+                indicates the maximum name length of the CBS server to be
+                displayed on log events, including the terminating NULL byte.
+                Reducing this value wil help conserving memory, but as a tradeoff
+                it might chop a portion the server name on the aforementioned logs.
+        
+        endif
     endmenu
     endif
 

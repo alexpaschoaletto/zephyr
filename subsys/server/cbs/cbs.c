@@ -98,27 +98,31 @@ static void cbs_budget_timer_start(cbs_t *cbs){
     #else
     cbs->start_cycle = k_cycle_get_32();
     #endif
-    k_timer_start(&cbs->timer, K_CYC(cbs->budget.current), K_NO_WAIT);
+    k_timer_start(cbs->timer, K_CYC(cbs->budget.current), K_NO_WAIT);
 }
 
 
 static void cbs_budget_timer_stop(cbs_t *cbs){
-    if(cbs->timer.status) return;
-    k_timer_stop(&cbs->timer);
+    if(cbs->timer->status) return;
+    k_timer_stop(cbs->timer);
 }
 
 
-void cbs_thread(void *job_queue, void *cbs_struct, void *unused){
-    (void) unused;
+void cbs_thread(void *server_name, void *cbs_struct, void *cbs_timer){
     cbs_job_t job;
     cbs_t *cbs = (cbs_t *) cbs_struct;
+    struct k_timer *timer = (struct k_timer *) cbs_timer;
 
 	cbs->thread = k_current_get();
     cbs->thread->cbs = cbs;
     cbs->start_cycle = 0;
-    cbs->queue = (struct k_msgq *) job_queue;
-    k_timer_init(&cbs->timer, cbs_budget_ran_out, cbs_budget_stop);
-    k_timer_user_data_set(&cbs->timer, cbs);
+    cbs->timer = timer;
+    k_timer_init(cbs->timer, cbs_budget_ran_out, cbs_budget_stop);
+    k_timer_user_data_set(cbs->timer, cbs);
+
+    #ifdef CONFIG_CBS_LOG
+    strncpy(cbs->name, (char *) server_name, CONFIG_CBS_THREAD_MAX_NAME_LEN - 1);
+    #endif
 
     for(;;){
         k_msgq_get(cbs->queue, &job, K_FOREVER);
