@@ -51,7 +51,7 @@ menu "Constant Bandwidth Server (CBS)"
         
         config CBS_CONDITION_SHIFT_AMOUNT
             int "CBS condition shift amount"
-            default 10
+            default 4
             help
                 One of the key differences of CBS (compared to other
                 real-time servers) is that, every time a new job is
