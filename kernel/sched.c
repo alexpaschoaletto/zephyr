@@ -878,7 +878,7 @@ struct k_thread *z_swap_next_thread(void)
 /* Just a wrapper around _current = xxx with tracing */
 static inline void set_current(struct k_thread *new_thread)
 {
-	// z_thread_mark_switched_out();
+	z_thread_mark_switched_out();
 	_current_cpu->current = new_thread;
 }
 
