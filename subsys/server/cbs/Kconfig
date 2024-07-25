@@ -31,7 +31,7 @@ menu "Constant Bandwidth Server (CBS)"
 
         config CBS_THREAD_STACK_SIZE
             int "CBS thread memory"
-            default 512
+            default 2048
             help
                 The amount of memory to be
                 allocated for the CBS thread.
@@ -45,7 +45,7 @@ menu "Constant Bandwidth Server (CBS)"
 
         config CBS_INITIAL_DELAY
             int "CBS thread initial delay"
-            default 0
+            default 1000
             help
                 Scheduling delay for the CBS thread.
         

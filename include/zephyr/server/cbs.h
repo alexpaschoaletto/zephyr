@@ -17,7 +17,6 @@ extern "C" {
 
 typedef void (* cbs_callback_t)(void *arg);
 
-
 typedef struct {
     cbs_callback_t function;
     void *arg;
@@ -25,8 +24,8 @@ typedef struct {
 
 
 typedef struct {
-    uint32_t current;
-    uint32_t max;
+    cbs_cycle_t current;
+    cbs_cycle_t max;
 } cbs_budget_t;
 
 
@@ -34,16 +33,10 @@ typedef struct {
     struct k_timer *timer;
     struct k_msgq *queue;
     struct k_thread *thread;
-	cbs_budget_t budget;
-	sys_snode_t node;
-	uint32_t period;
-    #ifdef CONFIG_TIMER_HAS_64BIT_CYCLE_COUNTER
-	uint64_t abs_deadline;
-	uint64_t start_cycle;
-    #else
-    uint32_t abs_deadline;
-    uint32_t start_cycle;
-    #endif
+    cbs_budget_t budget;
+	cbs_cycle_t period;
+    cbs_cycle_t abs_deadline;
+	cbs_cycle_t start_cycle;
     #ifdef CONFIG_CBS_LOG
     char name[CONFIG_CBS_THREAD_MAX_NAME_LEN];
     #endif
