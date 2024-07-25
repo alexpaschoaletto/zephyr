@@ -22,7 +22,7 @@ enum cbs_evt {
     CBS_BUDGET_CONDITION_MET
 };
 
-void cbs_trace(enum cbs_evt event, cbs_t *cbs);
+void cbs_log(enum cbs_evt event, cbs_t *cbs);
 
 #ifdef __cplusplus
 }
