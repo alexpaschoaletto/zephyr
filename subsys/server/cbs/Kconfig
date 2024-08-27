@@ -47,7 +47,7 @@ menu "Constant Bandwidth Server (CBS)"
             int "CBS thread initial delay"
             default 1000
             help
-                Scheduling delay for the CBS thread.
+                Scheduling delay (in milliseconds) for the CBS thread.
         
         config CBS_CONDITION_SHIFT_AMOUNT
             int "CBS condition shift amount"
