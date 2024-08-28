@@ -10,7 +10,15 @@
 #include <string.h>
 #include "lib/helper.h"
 
+/*
+	Remember that for "pure" EDF results, all
+	user threads must have the same static priority.
+	That happens because EDF will be a tie-breaker
+	among two or more ready tasks of the same static
+	priority. An arbitrary positive number is chosen here.
+*/
 #define EDF_PRIORITY 5
+#define TASK_RELATIVE_DEADLINE_US 40000000
 
 typedef struct {
     char msg[100];
@@ -19,7 +27,6 @@ typedef struct {
 
 job_t job1 = { .msg = "[job]\t\tj1 on", .counter = 0 };
 job_t job2 = { .msg = "[job]\t\tj2 on", .counter = 0 };
-
 
 /*
 	The CBS job must return void and receive a void*
@@ -56,25 +63,31 @@ void job_function(void *arg){
 
 */
 
-K_CBS_DEFINE(cbs_1, K_MSEC(20), K_MSEC(200), EDF_PRIORITY);
+K_CBS_DEFINE(cbs_1, K_MSEC(10), K_MSEC(20), EDF_PRIORITY);
 // K_CBS_DEFINE(cbs_2, K_USEC(100), K_USEC(600), EDF_PRIORITY);
 
+/*
+	Just a high priority thread, EDF wise,
+	that pushes jobs every 2 seconds to a CBS.
 
-int main(void){
-    k_sleep(K_SECONDS(1));
-    report_cbs_settings();
+	The current example will push three jobs at once
+	to cbs_1 every two seconds. Try changing the
+	amount of those to see what happens!
+*/
+void thread_function(void *rel_deadline_us, void *a2, void *a3){
+	k_tid_t this_thread = k_current_get();
+	int32_t relative_deadline_cyc = us_to_cyc((int32_t) rel_deadline_us);
+	report_cbs_settings();
+	
 	for(;;){
-		/*
-			The current example will push three jobs at once
-			to cbs_1 every two seconds. Try changing the
-			amount of those to see what happens!
-		*/
+		k_thread_deadline_set(this_thread, relative_deadline_cyc);
         printf("\n");
-        k_sleep(K_SECONDS(2));
         k_cbs_push_job(&cbs_1, job_function, &job1, K_NO_WAIT);
         k_cbs_push_job(&cbs_1, job_function, &job1, K_NO_WAIT);
         k_cbs_push_job(&cbs_1, job_function, &job1, K_NO_WAIT);
-        // k_cbs_push_job(&cbs_2, job_function, &job2, K_NO_WAIT);
+		// k_cbs_push_job(&cbs_2, job_function, &job2, K_NO_WAIT);
+		k_sleep(K_SECONDS(5));
 	}
-	return 0;
 }
+
+K_THREAD_DEFINE(periodic_task, 2048, thread_function, TASK_RELATIVE_DEADLINE_US, NULL, NULL, EDF_PRIORITY, 0, 2000);

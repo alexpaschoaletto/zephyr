@@ -1,6 +1,10 @@
 #ifndef _APP_HELPER_H_
 #define _APP_HELPER_H_
 
+int32_t us_to_cyc(int32_t usec){
+    return ((usec * CONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC) / USEC_PER_SEC);
+}
+
 void report_cbs_settings(){
     printk("\n//////////////////////////////////////////////////////////////////////////////////////\n");
     printk("\nBoard:\t\t%s\n", CONFIG_BOARD_TARGET);

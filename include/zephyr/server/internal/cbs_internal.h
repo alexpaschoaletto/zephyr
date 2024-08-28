@@ -14,9 +14,8 @@ extern "C" {
 
 /**
  * @defgroup cbs_internal_apis Constant Bandwidth Server (CBS) internal APIs
- * @ingroup cbs_apis
  * @{
- */
+*/
 
 
 #ifdef CONFIG_TIMER_HAS_64BIT_CYCLE_COUNTER
