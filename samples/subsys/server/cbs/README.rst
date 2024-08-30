@@ -1,7 +1,7 @@
 .. _cbs_sample:
 
-Constant Bandwidth Server (CBS) Sample
-######################################
+Constant Bandwidth Server (CBS)
+###############################
 
 Overview
 ********
@@ -24,7 +24,7 @@ The logging feature is enabled by default, which allows users to see
 the key events of a CBS in the console as they happen. The events are:
 
 .. list-table:: Constant Bandwidth Server (CBS) events
-   :widths: 10 65
+   :widths: 10 90
    :header-rows: 1
 
    * - Event
@@ -42,6 +42,11 @@ the key events of a CBS in the console as they happen. The events are:
    * - SWT_AY
      - the CBS thread left the CPU due to preemption or ending job execution.
 
+The server deadline recalculates whenever the budget is restored - that is, when
+either the condition is met (B_COND) or it simply runs out (B_ROUT). In the first
+case, the deadline will be set as job arrival instant + CBS period, whereas in the
+latter it will be simply postponed by the CBS period.  
+
 Building and Running
 ********************
 
@@ -54,16 +59,24 @@ This application can be built and executed on QEMU as follows:
    :goals: run
    :compact:
 
-To build for another board, change "qemu_riscv32" above to that board's name.
+To build and run on a physical target (i.e. XIAO ESP32-C3) instead,
+run the following:
 
+.. zephyr-app-commands::
+   :zephyr-app: samples/subsys/server/cbs
+   :board: xiao_esp32c3
+   :goals: build flash
+   :compact:
 
 Sample Output
 =============
 
-The example below shows the output for the target xiao_esp32c3. The value alongside
-the event log is the budget level, in hardware cycles. The CBS thread does an underlying
-conversion from timeout units passed on ``K_CBS_DEFINE()`` (e.g. ``K_USEC()``) to ensure units
-compatibility with ``k_thread_deadline_set()``, which currently accepts only hardware cycles.
+The example below shows the output for the target xiao_esp32c3.
+The value alongside the event log is the budget level, in
+hardware cycles. The CBS thread does an underlying conversion
+from timeout units passed on ``K_CBS_DEFINE()`` (e.g. ``K_USEC()``)
+to ensure units compatibility with ``k_thread_deadline_set()``,
+which currently accepts only hardware cycles.
 
 .. code-block:: console
 
@@ -80,5 +93,3 @@ compatibility with ``k_thread_deadline_set()``, which currently accepts only har
   [00:00:47.073,000] <inf> CBS: cbs_1     J_COMP  104669      // first job completed
   [00:00:47.077,000] <inf> CBS: cbs_1     J_COMP  25687       // second job completed
   [00:00:47.077,000] <inf> CBS: cbs_1     SWT_AY  25687       // CBS thread leaves CPU
-
-Exit QEMU by pressing :kbd:`CTRL+A` :kbd:`x`.
