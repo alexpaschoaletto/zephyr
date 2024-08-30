@@ -3,6 +3,12 @@
 *  SPDX-License-Identifier: Apache-2.0
 */
 
+/**
+ * @file
+ *
+ * @brief Public Constant Bandwidth Server (CBS) APIs.
+ */
+
 #ifndef ZEPHYR_CBS
 #define ZEPHYR_CBS
 

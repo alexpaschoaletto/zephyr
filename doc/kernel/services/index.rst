@@ -30,6 +30,7 @@ synchronization.
 .. toctree::
    :maxdepth: 1
 
+   real_time_servers/cbs.rst
    threads/index.rst
    scheduling/index.rst
    threads/system_threads.rst
