@@ -66,7 +66,7 @@ run the following:
 Sample Output
 =============
 
-The example below shows the output for the target xiao_esp32c3.
+The example below shows the output for the target qemu_riscv32.
 The value alongside the event log is the budget level, in
 hardware cycles. The CBS thread does an underlying conversion
 from timeout units passed on :c:macro:`K_CBS_DEFINE` (e.g. :c:macro:`K_USEC`)
@@ -75,18 +75,18 @@ which currently accepts only hardware cycles.
 
 .. code-block:: console
 
-  [job]           j1 on xiao_esp32c3/esp32c3, 27
+  [job]           j1 on qemu_riscv32/qemu_virt_riscv32, 15
 
-  [job]           j1 on xiao_esp32c3/esp32c3, 28
+  [job]           j1 on qemu_riscv32/qemu_virt_riscv32, 16
 
-  [job]           j1 on xiao_esp32c3/esp32c3, 29
+  [job]           j1 on qemu_riscv32/qemu_virt_riscv32, 17
 
-  [00:00:47.069,000] <inf> CBS: cbs_1     J_PUSH  25660       // first job is pushed to the queue
-  [00:00:47.069,000] <inf> CBS: cbs_1     B_COND  160000      // condition is met, budget is replenished
-  [00:00:47.069,000] <inf> CBS: cbs_1     J_PUSH  160000      // other job is pushed
-  [00:00:47.069,000] <inf> CBS: cbs_1     J_PUSH  160000      // other job is pushed
-  [00:00:47.069,000] <inf> CBS: cbs_1     SWT_TO  160000      // CBS thread enters CPU
-  [00:00:47.073,000] <inf> CBS: cbs_1     J_COMP  104669      // first job completed
-  [00:00:47.077,000] <inf> CBS: cbs_1     J_COMP  25687       // second job completed
-  [00:00:47.081,000] <inf> CBS: cbs_1     J_COMP  25687       // third job completed
-  [00:00:47.081,000] <inf> CBS: cbs_1     SWT_AY  25687       // CBS thread leaves CPU
+  [00:00:12.028,000] <inf> CBS: cbs_1     J_PUSH  43543     // first job is pushed
+  [00:00:12.028,000] <inf> CBS: cbs_1     B_COND  100000    // conditiom met, budget replenished
+  [00:00:12.028,000] <inf> CBS: cbs_1     J_PUSH  100000    // more jobs pushed
+  [00:00:12.028,000] <inf> CBS: cbs_1     J_PUSH  100000
+  [00:00:12.028,000] <inf> CBS: cbs_1     SWT_TO  100000    // CBS thread enters CPU to execute
+  [00:00:12.031,000] <inf> CBS: cbs_1     J_COMP  68954     // first job completed
+  [00:00:12.033,000] <inf> CBS: cbs_1     J_COMP  54372
+  [00:00:12.034,000] <inf> CBS: cbs_1     J_COMP  38914     // last job completed
+  [00:00:12.034,000] <inf> CBS: cbs_1     SWT_AY  38914     // CBS thread leaves the CPU

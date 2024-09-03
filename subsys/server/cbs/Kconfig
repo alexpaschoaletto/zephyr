@@ -69,7 +69,7 @@ menu "Constant Bandwidth Server (CBS)"
                 the division takes place, which is equivalent to a simple
                 left-shift operation in assembly.
         
-        config CBS_CHECK_CONDITION_SHIFT_OVERFLOW
+        config CBS_CONDITION_SHIFT_CHECK_OVERFLOW
             bool "CBS condition calculation oveflow check"
             default y
             help
@@ -77,8 +77,10 @@ menu "Constant Bandwidth Server (CBS)"
                 with the shift amount defined, can or not result in an
                 overflow during CBS condition calculations. An overflow
                 does't stop the server from running, but can cause errors
-                in calculation which lead to wrong results. When enabled,
-                the CBS thread will throw a warning in the console.
+                in calculation which lead to budget replenishing and
+                deadline changes happening in unexpected moments.
+                When enabled, the CBS thread will throw a warning in the
+                console if the given values could result in overflow.
 
         if CBS_LOG
 

@@ -205,9 +205,10 @@ void cbs_thread(void *server_name, void *cbs_struct, void *cbs_args){
     strncpy(cbs->name, (char *) server_name, CONFIG_CBS_THREAD_MAX_NAME_LEN - 1);
     #endif
     
-    #ifdef CONFIG_CBS_CHECK_CONDITION_SHIFT_OVERFLOW
-    printf("\n%u >= %u\n\n", cbs->budget.max, (INT_MAX >> CONFIG_CBS_CONDITION_SHIFT_AMOUNT));
+    #ifdef CONFIG_CBS_CONDITION_SHIFT_CHECK_OVERFLOW
     if(cbs->budget.max >= (INT_MAX >> CONFIG_CBS_CONDITION_SHIFT_AMOUNT)){
+        /* waits a little before throwing the warning */
+        k_sleep(K_SECONDS(1));
         printk("\nWARNING! budget given for CBS '%s' might overflow on CBS condition calculations.\n", (char *) server_name);
         printk("Consider lowering the value or decreasing CONFIG_CBS_CONDITION_SHIFT_AMOUNT (current: %d).\n\n", CONFIG_CBS_CONDITION_SHIFT_AMOUNT);
     }
@@ -269,8 +270,10 @@ int k_cbs_push_job(cbs_t *cbs, cbs_callback_t job_function, void *job_arg, k_tim
         #ifdef CONFIG_CBS_LOG
         cbs_log(CBS_PUSH_JOB, cbs);
         #endif
+        k_sched_lock();
         cbs_budget_restore_if_condition(cbs);
         cbs->is_idle = false;
+        k_sched_unlock();
     }
     
     return result;
