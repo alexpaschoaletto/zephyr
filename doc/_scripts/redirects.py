@@ -206,6 +206,8 @@ REDIRECTS = [
     ('samples/bluetooth/broadcast_audio_assistant/README', 'samples/bluetooth/bap_broadcast_assistant/README'),
     ('samples/bluetooth/broadcast_audio_sink/README', 'samples/bluetooth/bap_broadcast_sink/README'),
     ('samples/bluetooth/broadcast_audio_source/README', 'samples/bluetooth/bap_broadcast_source/README'),
+    ('samples/bluetooth/central_iso/README', 'samples/bluetooth/iso_central/README'),
+    ('samples/bluetooth/peripheral_iso/README', 'samples/bluetooth/iso_peripheral/README'),
     ('samples/bluetooth/public_broadcast_sink/README', 'samples/bluetooth/pbp_public_broadcast_sink/README'),
     ('samples/bluetooth/public_broadcast_source/README', 'samples/bluetooth/pbp_public_broadcast_source/README'),
     ('samples/bluetooth/unicast_audio_client/README', 'samples/bluetooth/bap_unicast_client/README'),
@@ -218,6 +220,9 @@ REDIRECTS = [
     ('samples/net/cloud/google_iot_mqtt/README', 'samples/net/cloud/cloud'),
     ('samples/sensor/wsen_hids/README', 'samples/sensor/sensor'),
     ('samples/sensor/wsen_itds/README', 'samples/sensor/sensor'),
+    ('samples/subsys/video/capture/README', 'samples/drivers/video/capture/README'),
+    ('samples/subsys/video/tcpserversink/README', 'samples/drivers/video/tcpserversink/README'),
+    ('samples/subsys/video/video', 'samples/drivers/video/video'),
     ('services/portability/posix', 'services/portability/posix/index'),
     # zephyr-keep-sorted-stop
 ]

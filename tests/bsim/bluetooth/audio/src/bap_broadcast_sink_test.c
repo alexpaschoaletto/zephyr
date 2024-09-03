@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2023 Nordic Semiconductor ASA
+ * Copyright (c) 2021-2024 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -20,6 +20,7 @@
 #include <zephyr/bluetooth/audio/pacs.h>
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/gap.h>
+#include <zephyr/bluetooth/hci_types.h>
 #include <zephyr/bluetooth/iso.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/kernel.h>
@@ -30,6 +31,7 @@
 #include <zephyr/sys/util_macro.h>
 #include <zephyr/toolchain.h>
 
+#include "bap_common.h"
 #include "bstests.h"
 #include "common.h"
 
@@ -45,6 +47,7 @@ CREATE_FLAG(flag_pa_sync_lost);
 CREATE_FLAG(flag_received);
 CREATE_FLAG(flag_pa_request);
 CREATE_FLAG(flag_bis_sync_requested);
+CREATE_FLAG(flag_big_sync_mic_failure);
 
 static struct bt_bap_broadcast_sink *g_sink;
 static struct bt_le_scan_recv_info broadcaster_info;
@@ -550,6 +553,10 @@ static void stopped_cb(struct bt_bap_stream *stream, uint8_t reason)
 {
 	printk("Stream %p stopped with reason 0x%02X\n", stream, reason);
 	k_sem_give(&sem_stopped);
+
+	if (reason == BT_HCI_ERR_TERM_DUE_TO_MIC_FAIL) {
+		SET_FLAG(flag_big_sync_mic_failure);
+	}
 }
 
 static void recv_cb(struct bt_bap_stream *stream,
@@ -652,28 +659,6 @@ static int init(void)
 	return 0;
 }
 
-static uint16_t interval_to_sync_timeout(uint16_t pa_interval)
-{
-	uint16_t pa_timeout;
-
-	if (pa_interval == BT_BAP_PA_INTERVAL_UNKNOWN) {
-		/* Use maximum value to maximize chance of success */
-		pa_timeout = BT_GAP_PER_ADV_MAX_TIMEOUT;
-	} else {
-		uint32_t interval_ms;
-		uint32_t timeout;
-
-		/* Add retries and convert to unit in 10's of ms */
-		interval_ms = BT_GAP_PER_ADV_INTERVAL_TO_MS(pa_interval);
-		timeout = (interval_ms * PA_SYNC_INTERVAL_TO_TIMEOUT_RATIO) / 10;
-
-		/* Enforce restraints */
-		pa_timeout = CLAMP(timeout, BT_GAP_PER_ADV_MIN_TIMEOUT, BT_GAP_PER_ADV_MAX_TIMEOUT);
-	}
-
-	return pa_timeout;
-}
-
 static int pa_sync_create(void)
 {
 	struct bt_le_per_adv_sync_param create_params = {0};
@@ -766,21 +751,15 @@ static void test_broadcast_sink_create_inval(void)
 	}
 }
 
-static void test_broadcast_sync(void)
+static void test_broadcast_sync(const uint8_t broadcast_code[BT_AUDIO_BROADCAST_CODE_SIZE])
 {
 	int err;
 
 	printk("Syncing the sink\n");
-	err = bt_bap_broadcast_sink_sync(g_sink, bis_index_bitfield, streams, NULL);
+	err = bt_bap_broadcast_sink_sync(g_sink, bis_index_bitfield, streams, broadcast_code);
 	if (err != 0) {
 		FAIL("Unable to sync the sink: %d\n", err);
 		return;
-	}
-
-	/* Wait for all to be started */
-	printk("Waiting for streams to be started\n");
-	for (size_t i = 0U; i < ARRAY_SIZE(streams); i++) {
-		k_sem_take(&sem_started, K_FOREVER);
 	}
 }
 
@@ -804,7 +783,7 @@ static void test_broadcast_sync_inval(void)
 		return;
 	}
 
-	bis_index = BIT(0);
+	bis_index = BT_ISO_BIS_INDEX_BIT(BT_ISO_BIS_INDEX_MAX + 1);
 	err = bt_bap_broadcast_sink_sync(g_sink, bis_index, streams, NULL);
 	if (err == 0) {
 		FAIL("bt_bap_broadcast_sink_sync did not fail with invalid BIS indexes: 0x%08X\n",
@@ -821,7 +800,7 @@ static void test_broadcast_sync_inval(void)
 	memcpy(tmp_streams, streams, sizeof(streams));
 	bis_index = 0U;
 	for (size_t i = 0U; i < ARRAY_SIZE(tmp_streams); i++) {
-		bis_index |= BIT(i + BT_ISO_BIS_INDEX_MIN);
+		bis_index |= BT_ISO_BIS_INDEX_BIT(i);
 	}
 
 	err = bt_bap_broadcast_sink_sync(g_sink, bis_index, tmp_streams, NULL);
@@ -833,7 +812,7 @@ static void test_broadcast_sync_inval(void)
 
 	bis_index = 0U;
 	for (size_t i = 0U; i < CONFIG_BT_BAP_BROADCAST_SNK_STREAM_COUNT + 1; i++) {
-		bis_index |= BIT(i + BT_ISO_BIS_INDEX_MIN);
+		bis_index |= BT_ISO_BIS_INDEX_BIT(i);
 	}
 
 	err = bt_bap_broadcast_sink_sync(g_sink, bis_index, tmp_streams, NULL);
@@ -952,7 +931,13 @@ static void test_common(void)
 	WAIT_FOR_FLAG(flag_syncable);
 
 	test_broadcast_sync_inval();
-	test_broadcast_sync();
+	test_broadcast_sync(NULL);
+
+	/* Wait for all to be started */
+	printk("Waiting for streams to be started\n");
+	for (size_t i = 0U; i < ARRAY_SIZE(streams); i++) {
+		k_sem_take(&sem_started, K_FOREVER);
+	}
 
 	printk("Waiting for data\n");
 	WAIT_FOR_FLAG(flag_received);
@@ -994,7 +979,14 @@ static void test_sink_disconnect(void)
 	test_broadcast_stop();
 
 	/* Retry sync*/
-	test_broadcast_sync();
+	test_broadcast_sync(NULL);
+
+	/* Wait for all to be started */
+	printk("Waiting for streams to be started\n");
+	for (size_t i = 0U; i < ARRAY_SIZE(streams); i++) {
+		k_sem_take(&sem_started, K_FOREVER);
+	}
+
 	test_broadcast_stop();
 
 	test_broadcast_delete_inval();
@@ -1003,6 +995,88 @@ static void test_sink_disconnect(void)
 	backchannel_sync_send_all(); /* let the broadcast source know it can stop */
 
 	PASS("Broadcast sink disconnect passed\n");
+}
+
+static void test_sink_encrypted(void)
+{
+	int err;
+
+	err = init();
+	if (err) {
+		FAIL("Init failed (err %d)\n", err);
+		return;
+	}
+
+	test_scan_and_pa_sync();
+
+	test_broadcast_sink_create();
+
+	printk("Broadcast source PA synced, waiting for BASE\n");
+	WAIT_FOR_FLAG(flag_base_received);
+	printk("BASE received\n");
+
+	printk("Waiting for BIG syncable\n");
+	WAIT_FOR_FLAG(flag_syncable);
+
+	test_broadcast_sync(BROADCAST_CODE);
+
+	/* Wait for all to be started */
+	printk("Waiting for streams to be started\n");
+	for (size_t i = 0U; i < ARRAY_SIZE(streams); i++) {
+		k_sem_take(&sem_started, K_FOREVER);
+	}
+
+	printk("Waiting for data\n");
+	WAIT_FOR_FLAG(flag_received);
+
+	backchannel_sync_send_all(); /* let other devices know we have received data */
+
+	backchannel_sync_send_all(); /* let the broadcast source know it can stop */
+
+	/* The order of PA sync lost and BIG Sync lost is irrelevant
+	 * and depend on timeout parameters. We just wait for PA first, but
+	 * either way will work.
+	 */
+	printk("Waiting for PA disconnected\n");
+	WAIT_FOR_FLAG(flag_pa_sync_lost);
+
+	printk("Waiting for streams to be stopped\n");
+	for (size_t i = 0U; i < ARRAY_SIZE(streams); i++) {
+		k_sem_take(&sem_stopped, K_FOREVER);
+	}
+
+	PASS("Broadcast sink encrypted passed\n");
+}
+
+static void test_sink_encrypted_incorrect_code(void)
+{
+	int err;
+
+	err = init();
+	if (err) {
+		FAIL("Init failed (err %d)\n", err);
+		return;
+	}
+
+	test_scan_and_pa_sync();
+
+	test_broadcast_sink_create();
+
+	printk("Broadcast source PA synced, waiting for BASE\n");
+	WAIT_FOR_FLAG(flag_base_received);
+	printk("BASE received\n");
+
+	printk("Waiting for BIG syncable\n");
+	WAIT_FOR_FLAG(flag_syncable);
+
+	test_broadcast_sync(INCORRECT_BROADCAST_CODE);
+	/* Wait for MIC failure */
+	WAIT_FOR_FLAG(flag_big_sync_mic_failure);
+
+	backchannel_sync_send_all(); /* let other devices know we have received data */
+	backchannel_sync_send_all(); /* let the broadcast source know it can stop */
+
+	PASS("Broadcast sink incorrect code passed\n");
 }
 
 static void broadcast_sink_with_assistant(void)
@@ -1033,7 +1107,13 @@ static void broadcast_sink_with_assistant(void)
 
 	printk("Waiting for BIG sync request\n");
 	WAIT_FOR_FLAG(flag_bis_sync_requested);
-	test_broadcast_sync();
+	test_broadcast_sync(NULL);
+
+	/* Wait for all to be started */
+	printk("Waiting for streams to be started\n");
+	for (size_t i = 0U; i < ARRAY_SIZE(streams); i++) {
+		k_sem_take(&sem_started, K_FOREVER);
+	}
 
 	printk("Waiting for data\n");
 	WAIT_FOR_FLAG(flag_received);
@@ -1070,6 +1150,18 @@ static const struct bst_test_instance test_broadcast_sink[] = {
 		.test_pre_init_f = test_init,
 		.test_tick_f = test_tick,
 		.test_main_f = test_sink_disconnect,
+	},
+	{
+		.test_id = "broadcast_sink_encrypted",
+		.test_pre_init_f = test_init,
+		.test_tick_f = test_tick,
+		.test_main_f = test_sink_encrypted,
+	},
+	{
+		.test_id = "broadcast_sink_encrypted_incorrect_code",
+		.test_pre_init_f = test_init,
+		.test_tick_f = test_tick,
+		.test_main_f = test_sink_encrypted_incorrect_code,
 	},
 	{
 		.test_id = "broadcast_sink_with_assistant",
