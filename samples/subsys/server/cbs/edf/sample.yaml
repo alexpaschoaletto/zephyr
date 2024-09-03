@@ -4,7 +4,7 @@
 
 sample:
   description: A basic Constant Bandwidth Server (CBS) example
-  name: Constant Bandwidth Server (CBS) sample
+  name: Constant Bandwidth Server (CBS) EDF sample
 common:
   tags:
     - CBS

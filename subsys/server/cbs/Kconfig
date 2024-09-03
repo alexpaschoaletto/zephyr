@@ -45,7 +45,7 @@ menu "Constant Bandwidth Server (CBS)"
 
         config CBS_INITIAL_DELAY
             int "CBS thread initial delay"
-            default 1000
+            default 0
             help
                 Scheduling delay (in milliseconds) for the CBS thread.
         
@@ -69,6 +69,17 @@ menu "Constant Bandwidth Server (CBS)"
                 the division takes place, which is equivalent to a simple
                 left-shift operation in assembly.
         
+        config CBS_CHECK_CONDITION_SHIFT_OVERFLOW
+            bool "CBS condition calculation oveflow check"
+            default y
+            help
+                This option checks if the budget given for a CBS, along
+                with the shift amount defined, can or not result in an
+                overflow during CBS condition calculations. An overflow
+                does't stop the server from running, but can cause errors
+                in calculation which lead to wrong results. When enabled,
+                the CBS thread will throw a warning in the console.
+
         if CBS_LOG
 
         config CBS_THREAD_MAX_NAME_LEN

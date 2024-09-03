@@ -139,9 +139,11 @@ static void cbs_budget_timer_stop_callback(struct k_timer *timer){
 
 
 static void cbs_budget_restore_if_condition(cbs_t *cbs){
-    if(!cbs_is_idle(cbs->thread)) return;
+    if(!cbs->is_initialized || !cbs->is_idle) return;
+
     cbs_cycle_t arrival = cbs_get_now();
     cbs_cycle_t deadline = cbs->abs_deadline;
+    // printf("%u > %u?\t", deadline, arrival);     //debug
     /*
         The CBS condition is that the server must be idle when a
         new job comes AND the following must hold:
@@ -161,9 +163,9 @@ static void cbs_budget_restore_if_condition(cbs_t *cbs){
         which means the condition is not met. 
     */
     if(deadline > arrival){                                                         
-        cbs_cycle_t budget = (cbs->budget.current << CONFIG_CBS_CONDITION_SHIFT_AMOUNT);                       
-        cbs_cycle_t bandwidth = (cbs->budget.max << CONFIG_CBS_CONDITION_SHIFT_AMOUNT) / cbs->period;          
-        if(budget < (deadline - arrival) * bandwidth) return;                        
+        cbs_cycle_t budget = (cbs->budget.current << CONFIG_CBS_CONDITION_SHIFT_AMOUNT);
+        // printf("%u >= (%u - %u) * %u ?\t", budget, deadline, arrival, cbs->bandwidth);   //debug
+        if(budget < (deadline - arrival) * cbs->bandwidth) return;
     }
     cbs_replenish_due_to_condition(cbs, arrival);
     k_thread_deadline_set(cbs->thread, (int) cbs->period);
@@ -194,13 +196,24 @@ void cbs_thread(void *server_name, void *cbs_struct, void *cbs_args){
     cbs->period = CBS_TICKS_TO_CYC(args->period.ticks);
     cbs->budget.max = CBS_TICKS_TO_CYC(args->budget.ticks);
     cbs->budget.current = cbs->budget.max;
-
+    cbs->bandwidth = (cbs->budget.max << CONFIG_CBS_CONDITION_SHIFT_AMOUNT) / cbs->period;
+    
     k_timer_init(cbs->timer, cbs_budget_timer_expired_callback, cbs_budget_timer_stop_callback);
     k_timer_user_data_set(cbs->timer, cbs);
 
     #ifdef CONFIG_CBS_LOG
     strncpy(cbs->name, (char *) server_name, CONFIG_CBS_THREAD_MAX_NAME_LEN - 1);
     #endif
+    
+    #ifdef CONFIG_CBS_CHECK_CONDITION_SHIFT_OVERFLOW
+    printf("\n%u >= %u\n\n", cbs->budget.max, (INT_MAX >> CONFIG_CBS_CONDITION_SHIFT_AMOUNT));
+    if(cbs->budget.max >= (INT_MAX >> CONFIG_CBS_CONDITION_SHIFT_AMOUNT)){
+        printk("\nWARNING! budget given for CBS '%s' might overflow on CBS condition calculations.\n", (char *) server_name);
+        printk("Consider lowering the value or decreasing CONFIG_CBS_CONDITION_SHIFT_AMOUNT (current: %d).\n\n", CONFIG_CBS_CONDITION_SHIFT_AMOUNT);
+    }
+    #endif
+
+    cbs->is_initialized = true;
 
     for(;;){
         /*
@@ -218,6 +231,8 @@ void cbs_thread(void *server_name, void *cbs_struct, void *cbs_args){
         #ifdef CONFIG_CBS_LOG
         cbs_log(CBS_COMPLETED_JOB, cbs);
         #endif
+
+        cbs->is_idle = (cbs->queue->used_msgs == 0);
     }
 }
 
@@ -255,6 +270,7 @@ int k_cbs_push_job(cbs_t *cbs, cbs_callback_t job_function, void *job_arg, k_tim
         cbs_log(CBS_PUSH_JOB, cbs);
         #endif
         cbs_budget_restore_if_condition(cbs);
+        cbs->is_idle = false;
     }
     
     return result;

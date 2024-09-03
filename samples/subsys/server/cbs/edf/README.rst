@@ -1,7 +1,7 @@
-.. _cbs_sample:
+.. _cbs_sample_edf:
 
-Constant Bandwidth Server (CBS)
-###############################
+Constant Bandwidth Server (CBS) on EDF
+######################################
 
 Overview
 ********
@@ -53,7 +53,7 @@ Building and Running
 This application can be built and executed on QEMU as follows:
 
 .. zephyr-app-commands::
-   :zephyr-app: samples/subsys/server/cbs
+   :zephyr-app: samples/subsys/server/cbs/edf
    :host-os: unix
    :board: qemu_riscv32
    :goals: run
@@ -63,7 +63,7 @@ To build and run on a physical target (i.e. XIAO ESP32-C3) instead,
 run the following:
 
 .. zephyr-app-commands::
-   :zephyr-app: samples/subsys/server/cbs
+   :zephyr-app: samples/subsys/server/cbs/edf
    :board: xiao_esp32c3
    :goals: build flash
    :compact:
@@ -85,11 +85,3 @@ which currently accepts only hardware cycles.
   [job]           j1 on xiao_esp32c3/esp32c3, 28
 
   [job]           j1 on xiao_esp32c3/esp32c3, 29
-
-  [00:00:47.069,000] <inf> CBS: cbs_1     J_PUSH  25660       // first job is pushed to the queue
-  [00:00:47.069,000] <inf> CBS: cbs_1     B_COND  160000      // condition is met, budget is replenished
-  [00:00:47.069,000] <inf> CBS: cbs_1     J_PUSH  160000      // other job is pushed
-  [00:00:47.069,000] <inf> CBS: cbs_1     SWT_TO  160000      // CBS thread enters CPU
-  [00:00:47.073,000] <inf> CBS: cbs_1     J_COMP  104669      // first job completed
-  [00:00:47.077,000] <inf> CBS: cbs_1     J_COMP  25687       // second job completed
-  [00:00:47.077,000] <inf> CBS: cbs_1     SWT_AY  25687       // CBS thread leaves CPU
