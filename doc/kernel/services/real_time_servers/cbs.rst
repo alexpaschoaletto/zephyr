@@ -178,7 +178,6 @@ this queue.
   but ISRs should **not** attempt to wait trying to push a job on the CBS
   queue. Moreover, jobs are executed within a system thread context.
 
-It should be noted the last parameter of ``
 
 Logging CBS events
 ==================
@@ -210,25 +209,21 @@ as minimal as possible.
    * - SWT_AY
      - the CBS thread left the CPU due to preemption or ending job execution.
 
-The example below shows the output for the target xiao_esp32c3. The
-value alongside the event log is the budget level, in hardware cycles.
-The CBS thread does an underlying conversion from timeout units passed
-on :c:macro:`K_CBS_DEFINE` (e.g. :c:macro:`K_USEC`) to ensure units compatibility
-with :c:func:`k_thread_deadline_set()`, which currently accepts only hardware
-cycles.
+The example below shows an example output when :kconfig:option:`CONFIG_CBS_LOG` is
+enabled. The value alongside the event log is the budget level, in hardware cycles.
+The CBS thread does an underlying conversion from timeout units passed on
+:c:macro:`K_CBS_DEFINE` (e.g. :c:macro:`K_USEC`) to ensure units compatibility
+with :c:func:`k_thread_deadline_set()`, which currently accepts only hardware cycles.
 
 .. code-block:: console
 
-  [00:00:47.069,000] <inf> CBS: cbs_1     J_PUSH  25660       // first job is pushed to the queue
-  [00:00:47.069,000] <inf> CBS: cbs_1     B_COND  160000      // condition is met, budget is replenished
-  [00:00:47.069,000] <inf> CBS: cbs_1     J_PUSH  160000      // other job is pushed
-  [00:00:47.069,000] <inf> CBS: cbs_1     SWT_TO  160000      // CBS thread enters CPU
-  [00:00:47.073,000] <inf> CBS: cbs_1     J_COMP  104669      // first job completed
-  [00:00:47.077,000] <inf> CBS: cbs_1     J_COMP  25687       // second job completed
-  [00:00:47.077,000] <inf> CBS: cbs_1     SWT_AY  25687       // CBS thread leaves CPU
-
-
-
+  [00:00:12.028,000] <inf> CBS: cbs_1     J_PUSH  43543     // first job is pushed
+  [00:00:12.028,000] <inf> CBS: cbs_1     B_COND  100000    // conditiom met, budget replenished
+  [00:00:12.028,000] <inf> CBS: cbs_1     J_PUSH  100000    // one more job pushed
+  [00:00:12.028,000] <inf> CBS: cbs_1     SWT_TO  100000    // CBS thread enters CPU to execute
+  [00:00:12.031,000] <inf> CBS: cbs_1     J_COMP  68954     // first job completed
+  [00:00:12.034,000] <inf> CBS: cbs_1     J_COMP  38914     // second job completed
+  [00:00:12.034,000] <inf> CBS: cbs_1     SWT_AY  38914     // CBS thread leaves the CPU
 
 
 Configuration Options
@@ -242,6 +237,7 @@ Related configuration options:
 * :kconfig:option:`CONFIG_CBS_QUEUE_LENGTH`
 * :kconfig:option:`CONFIG_CBS_INITIAL_DELAY`
 * :kconfig:option:`CONFIG_CBS_CONDITION_SHIFT_AMOUNT`
+* :kconfig:option:`CONFIG_CBS_CONDITION_SHIFT_CHECK_OVERFLOW`
 * :kconfig:option:`CONFIG_CBS_THREAD_MAX_NAME_LEN`
 
 API Reference
