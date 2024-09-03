@@ -6,7 +6,7 @@
 /**
  * @file
  *
- * @brief Public Constant Bandwidth Server (CBS) APIs.
+ * @brief Constant Bandwidth Server (CBS) public API
  */
 
 #ifndef ZEPHYR_CBS
@@ -23,6 +23,7 @@ extern "C" {
 
 /**
  * @defgroup cbs_apis Constant Bandwidth Server (CBS) APIs
+ * @ingroup kernel_apis
  * @{
  */
 
@@ -57,6 +58,9 @@ typedef struct {
 	cbs_cycle_t period;
     cbs_cycle_t abs_deadline;
 	cbs_cycle_t start_cycle;
+    cbs_cycle_t bandwidth;
+    bool is_initialized;
+    bool is_idle;
     #ifdef CONFIG_CBS_LOG
     char name[CONFIG_CBS_THREAD_MAX_NAME_LEN];
     #endif
@@ -73,7 +77,7 @@ typedef struct {
  *
  * @param cbs Name of the CBS job queue.
  * @param job_function Function of the job.
- * @param cbs_period Argument to be passed to the job function.
+ * @param job_arg Argument to be passed to the job function.
  * @param timeout Waiting period to push the job, or one of the special values K_NO_WAIT and K_FOREVER. 
  *
  * @retval 0 Job pushed to the CBS queue.
@@ -103,9 +107,9 @@ int k_cbs_push_job(cbs_t *cbs, cbs_callback_t job_function, void *job_arg, k_tim
  *
  * If there are no jobs left to execute, the CBS switches to the pending state,
  * remaining inactive until a new job is pushed to its queue. Once created, the
- * CBS is accessible through its job queue:
+ * CBS can be referenced through its name:
  *
- * @code extern const struct k_msgq <name>; @endcode
+ * @code extern const struct cbs_t <cbs_name>; @endcode
  *
  * @param cbs_name Name of the CBS job queue.
  * @param cbs_budget Budget of the CBS thread, in system ticks.
@@ -125,7 +129,8 @@ int k_cbs_push_job(cbs_t *cbs, cbs_callback_t job_function, void *job_arg, k_tim
     static struct k_timer timer_##cbs_name;                                           \
     static cbs_t cbs_name = {                                                         \
         .queue = &queue_##cbs_name,                                                   \
-        .timer = &timer_##cbs_name                                                    \
+        .timer = &timer_##cbs_name,                                                   \
+        .is_initialized = false                                                       \
     };                                                                                \
     static cbs_arg_t args_##cbs_name = {                                              \
         .budget = cbs_budget,                                                         \

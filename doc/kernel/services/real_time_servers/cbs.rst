@@ -206,7 +206,7 @@ as minimal as possible.
    * - B_ROUT
      - the budget ran out mid-execution and was replenished.
    * - SWT_TO
-     - the CBS thread entered the CPU to execute a received job.
+     - the CBS thread entered the CPU to start or resume a received job execution.
    * - SWT_AY
      - the CBS thread left the CPU due to preemption or ending job execution.
 
