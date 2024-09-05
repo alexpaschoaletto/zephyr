@@ -176,7 +176,10 @@ this queue.
 .. note::
   one can call :c:func:`k_cbs_push_job` from an ISR or a thread context,
   but ISRs should **not** attempt to wait trying to push a job on the CBS
-  queue. Moreover, jobs are executed within a system thread context.
+  queue. Moreover, jobs are executed within a system thread context but
+  should **not** attempt to directly interact with the CBS thread (e.g.
+  suspend it or change its static priority on the fly), as it would likely
+  lead to unexpected behavior.
 
 
 Logging CBS events
