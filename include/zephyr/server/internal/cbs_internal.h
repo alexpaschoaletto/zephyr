@@ -6,7 +6,7 @@
 /**
  * @file
  *
- * @brief Public Constant Bandwidth Server (CBS) internal APIs
+ * @brief Constant Bandwidth Server (CBS) internal APIs
  */
 
 #ifndef ZEPHYR_CBS_INTERNAL
