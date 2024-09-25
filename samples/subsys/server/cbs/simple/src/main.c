@@ -66,7 +66,7 @@ void job_function(void *arg){
 
 */
 
-K_CBS_DEFINE(cbs_1, K_MSEC(10), K_MSEC(20), EDF_PRIORITY);
+K_CBS_DEFINE(cbs_1, K_MSEC(80), K_SECONDS(2), EDF_PRIORITY);
 // K_CBS_DEFINE(cbs_2, K_USEC(100), K_USEC(600), EDF_PRIORITY);
 
 int main(void){
@@ -79,7 +79,7 @@ int main(void){
         k_cbs_push_job(&cbs_1, job_function, &job1, K_NO_WAIT);
         k_cbs_push_job(&cbs_1, job_function, &job1, K_NO_WAIT);
 		// k_cbs_push_job(&cbs_2, job_function, &job2, K_NO_WAIT);
-		k_sleep(K_SECONDS(2));
+		k_sleep(K_SECONDS(1));
 	}
 
 	return 0;

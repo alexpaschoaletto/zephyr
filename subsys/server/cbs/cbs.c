@@ -143,28 +143,29 @@ static void cbs_budget_restore_if_condition(cbs_t *cbs){
 
     cbs_cycle_t arrival = cbs_get_now();
     cbs_cycle_t deadline = cbs->abs_deadline;
-    // printf("%u > %u?\t", deadline, arrival);     //debug
+    // printk("%llu < %llu?\n", deadline, arrival);     //debug
     /*
-        The CBS condition is that the server must be idle when a
-        new job comes AND the following must hold:
+        The CBS condition is that the server must
+        be idle when a new job comes AND the
+        following must hold:
 
-        Cs >= (ds - rjob) * (Qs / T)
+        Cs >= (ds - rjob) * U
 
-        Where Cs is the budget left, ds is the absolute deadline,
-        rjob is the arrival instant of the job, Qs is the server
-        max budget and T is the server period.
+        Where Cs is the budget left, ds is the
+        absolute deadline, rjob is the arrival
+        instant of the job and U is the server
+        bandwidth (max budget / period).
 
-        So if arrival >= deadline, condition is instantly met. Otherwise,
-        we need to check more stuff. Note we multiply both budget and
-        bandwidth by 2^(CBS_CONDITION_SHIFT_AMOUNT). This is meant
-        to avoid the possiblity of the integer division resulting in 0. 
-        
-        we exit without doing anything if Cs < (ds - rjob) * (Qs / T),
-        which means the condition is not met. 
+        So if arrival >= deadline, condition is
+        instantly met. Otherwise, we need to check
+        more stuff. We exit without doing anything
+        if Cs < (ds - rjob) * U, which means the
+        condition is not met. 
     */
     if(deadline > arrival){                                                         
-        cbs_cycle_t budget = (cbs->budget.current << CONFIG_CBS_CONDITION_SHIFT_AMOUNT);
-        // printf("%u >= (%u - %u) * %u ?\t", budget, deadline, arrival, cbs->bandwidth);   //debug
+        cbs_cycle_t budget = (cbs->budget.current << cbs->left_shift);
+        // printk("%llu << %u = %llu\n", cbs->budget.current, cbs->left_shift, budget);         //debug
+        // printk("%llu >= (%llu - %llu) * %llu ?\n", budget, deadline, arrival, cbs->bandwidth);   //debug
         if(budget < (deadline - arrival) * cbs->bandwidth) return;
     }
     cbs_replenish_due_to_condition(cbs, arrival);
@@ -173,7 +174,7 @@ static void cbs_budget_restore_if_condition(cbs_t *cbs){
 
 
 static void cbs_budget_timer_start(cbs_t *cbs){
-    if(!cbs) return;
+    if(!cbs || !cbs->is_initialized) return;
     cbs->start_cycle = cbs_get_now();
     k_timer_start(cbs->timer, K_CYC((uint32_t) cbs->budget.current), K_NO_WAIT);
 }
@@ -196,7 +197,30 @@ void cbs_thread(void *server_name, void *cbs_struct, void *cbs_args){
     cbs->period = CBS_TICKS_TO_CYC(args->period.ticks);
     cbs->budget.max = CBS_TICKS_TO_CYC(args->budget.ticks);
     cbs->budget.current = cbs->budget.max;
-    cbs->bandwidth = (cbs->budget.max << CONFIG_CBS_CONDITION_SHIFT_AMOUNT) / cbs->period;
+    cbs->left_shift = 0;
+    cbs->abs_deadline = 0;
+
+    /*
+        This for(;;) finds the highest left-shift value
+        we can apply to the budget before overflowing it.
+
+        The actual left shift logical is done because the
+        CBS condition checks an equation that, in paper,
+        uses decimal numbers within it. However, all math
+        made here keeps the unsigned integer types of the
+        variables involved for performance reasons. So
+        the shift is applied in both sides of the equation
+        in an attempr to preserve the value resolution. 
+
+        more details in cbs_budget_restore_if_condition().
+    */
+    for(unsigned int right_shift = 1; right_shift < 32; right_shift++){
+        if((INT_MAX >> right_shift) < cbs->budget.max){
+            cbs->left_shift = right_shift - 1;
+            cbs->bandwidth = (cbs->budget.max << cbs->left_shift) / cbs->period;
+            break;
+        }
+    }
     
     k_timer_init(cbs->timer, cbs_budget_timer_expired_callback, cbs_budget_timer_stop_callback);
     k_timer_user_data_set(cbs->timer, cbs);
@@ -204,16 +228,8 @@ void cbs_thread(void *server_name, void *cbs_struct, void *cbs_args){
     #ifdef CONFIG_CBS_LOG
     strncpy(cbs->name, (char *) server_name, CONFIG_CBS_THREAD_MAX_NAME_LEN - 1);
     #endif
-    
-    #ifdef CONFIG_CBS_CONDITION_SHIFT_CHECK_OVERFLOW
-    if(cbs->budget.max >= (INT_MAX >> CONFIG_CBS_CONDITION_SHIFT_AMOUNT)){
-        /* waits a little before throwing the warning */
-        k_sleep(K_SECONDS(1));
-        printk("\nWARNING! budget given for CBS '%s' might overflow on CBS condition calculations.\n", (char *) server_name);
-        printk("Consider lowering the value or decreasing CONFIG_CBS_CONDITION_SHIFT_AMOUNT (current: %d).\n\n", CONFIG_CBS_CONDITION_SHIFT_AMOUNT);
-    }
-    #endif
 
+    cbs->is_idle = true;
     cbs->is_initialized = true;
 
     for(;;){
@@ -241,8 +257,9 @@ void cbs_thread(void *server_name, void *cbs_struct, void *cbs_args){
 void cbs_thread_switched_in(struct k_thread *thread){
     if(!thread || !thread->cbs) return;
     cbs_t *cbs = (cbs_t *)thread->cbs;
-    cbs_budget_timer_start(cbs);
-
+    if(cbs->is_initialized && !cbs->is_idle){
+        cbs_budget_timer_start(cbs);
+    }
     #ifdef CONFIG_CBS_LOG
     cbs_log(CBS_SWITCH_TO, cbs);
     #endif
@@ -252,7 +269,9 @@ void cbs_thread_switched_in(struct k_thread *thread){
 void cbs_thread_switched_out(struct k_thread *thread){
     if(!thread || !thread->cbs) return;
     cbs_t *cbs = (cbs_t *)thread->cbs;
-    cbs_budget_timer_stop(cbs);
+    if(cbs->is_initialized && cbs->is_idle){
+        cbs_budget_timer_stop(cbs);
+    }
 
     #ifdef CONFIG_CBS_LOG
     cbs_log(CBS_SWITCH_AWAY, cbs);

@@ -48,39 +48,6 @@ menu "Constant Bandwidth Server (CBS)"
             default 0
             help
                 Scheduling delay (in milliseconds) for the CBS thread.
-        
-        config CBS_CONDITION_SHIFT_AMOUNT
-            int "CBS condition shift amount"
-            default 4
-            help
-                One of the key differences of CBS (compared to other
-                real-time servers) is that, every time a new job is
-                pushed to the queue, the server checks a certain
-                condition to know whether or not it should replenish
-                its own budget before serving the new job.
-                
-                The condition is a mathematical formula that depends
-                on the current state of the server and the arrival
-                instant of the newcoming job. Although it involves
-                dividing and may have negative numbers, The current
-                math is performed with unsigned integers to optimize
-                performance. To avoid losing too much precision, both
-                sides of the equation are multiplied by (2^shift) before
-                the division takes place, which is equivalent to a simple
-                left-shift operation in assembly.
-        
-        config CBS_CONDITION_SHIFT_CHECK_OVERFLOW
-            bool "CBS condition calculation oveflow check"
-            default y
-            help
-                This option checks if the budget given for a CBS, along
-                with the shift amount defined, can or not result in an
-                overflow during CBS condition calculations. An overflow
-                does't stop the server from running, but can cause errors
-                in calculation which lead to budget replenishing and
-                deadline changes happening in unexpected moments.
-                When enabled, the CBS thread will throw a warning in the
-                console if the given values could result in overflow.
 
         if CBS_LOG
 

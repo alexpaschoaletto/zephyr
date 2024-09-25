@@ -61,6 +61,7 @@ typedef struct {
     cbs_cycle_t bandwidth;
     bool is_initialized;
     bool is_idle;
+    unsigned int left_shift;
     #ifdef CONFIG_CBS_LOG
     char name[CONFIG_CBS_THREAD_MAX_NAME_LEN];
     #endif
