@@ -239,8 +239,6 @@ Related configuration options:
 * :kconfig:option:`CONFIG_CBS_THREAD_STACK_SIZE`
 * :kconfig:option:`CONFIG_CBS_QUEUE_LENGTH`
 * :kconfig:option:`CONFIG_CBS_INITIAL_DELAY`
-* :kconfig:option:`CONFIG_CBS_CONDITION_SHIFT_AMOUNT`
-* :kconfig:option:`CONFIG_CBS_CONDITION_SHIFT_CHECK_OVERFLOW`
 * :kconfig:option:`CONFIG_CBS_THREAD_MAX_NAME_LEN`
 
 API Reference
