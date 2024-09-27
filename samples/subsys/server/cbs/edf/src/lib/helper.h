@@ -8,22 +8,28 @@
 	among two or more ready tasks of the same static
 	priority. An arbitrary positive number is chosen here.
 */
-#define EDF_PRIORITY 5
 
-#define INACTIVE    -1
-
-#define SEC_TO_CYC(sec)     (sec * CONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC)
-#define USEC_TO_CYC(usec)   ((CONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC / USEC_PER_SEC) * usec)
+#define EDF_PRIORITY            5
+#define INACTIVE                -1
+#define MSEC_TO_CYC(msec)       ((msec * CONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC) / MSEC_PER_SEC)
+#define MSEC_TO_USEC(msec)      (msec * 1000)
 
 typedef struct {
-    int32_t period_cyc;
-    int32_t rel_deadline_cyc;
+    int id;
+    int32_t rel_deadline_msec;
+    int32_t period_msec;
+    uint32_t wcet_msec;
+    k_tid_t thread;
+    struct k_msgq queue;
+    struct k_timer timer;
 } edf_t;
+
 
 typedef struct {
     char msg[100];
     uint32_t counter;
 } job_t;
+
 
 void report_cbs_settings(){
     printf("\n//////////////////////////////////////////////////////////////////////////////////////\n");

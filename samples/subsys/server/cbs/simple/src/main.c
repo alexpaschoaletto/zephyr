@@ -79,7 +79,7 @@ int main(void){
         k_cbs_push_job(&cbs_1, job_function, &job1, K_NO_WAIT);
         k_cbs_push_job(&cbs_1, job_function, &job1, K_NO_WAIT);
 		// k_cbs_push_job(&cbs_2, job_function, &job2, K_NO_WAIT);
-		k_sleep(K_SECONDS(1));
+		k_sleep(K_SECONDS(2));
 	}
 
 	return 0;
