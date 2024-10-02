@@ -70,6 +70,9 @@ MEMORY
     LINKER_DT_REGIONS()
     /* Used by and documented in include/linker/intlist.ld */
     IDT_LIST  (wx) : ORIGIN = 0xFFFF8000, LENGTH = 32K
+#ifdef CONFIG_LINKER_USE_ONDEMAND_SECTION
+    ONDEMAND (rx) : ORIGIN = (CONFIG_KERNEL_VM_BASE), LENGTH = (CONFIG_KERNEL_VM_SIZE)
+#endif
 }
 
 ENTRY(CONFIG_KERNEL_ENTRY)
@@ -218,25 +221,6 @@ SECTIONS
     z_mapped_start = .;
 #endif
 
-    __data_region_start = .;
-
-    SECTION_DATA_PROLOGUE(_DATA_SECTION_NAME,,)
-    {
-        MMU_ALIGN;
-	__data_start = .;
-        *(.data)
-        *(".data.*")
-        *(".kernel.*")
-
-#include <snippets-rwdata.ld>
-
-        __data_end = .;
-    } GROUP_DATA_LINK_IN(RAMABLE_REGION, ROMABLE_REGION)
-    __data_size = __data_end - __data_start;
-    __data_load_start = LOADADDR(_DATA_SECTION_NAME);
-
-#include <snippets-ram-sections.ld>
-
 #if defined(CONFIG_USERSPACE)
 #define APP_SHARED_ALIGN . = ALIGN(_region_min_align);
 #define SMEM_PARTITION_ALIGN(size) MMU_ALIGN
@@ -256,6 +240,25 @@ SECTIONS
     _app_smem_size = _app_smem_end - _app_smem_start;
     _app_smem_rom_start = LOADADDR(_APP_SMEM_SECTION_NAME);
 #endif  /* CONFIG_USERSPACE */
+
+    __data_region_start = .;
+
+    SECTION_DATA_PROLOGUE(_DATA_SECTION_NAME,,)
+    {
+        MMU_ALIGN;
+	__data_start = .;
+        *(.data)
+        *(".data.*")
+        *(".kernel.*")
+
+#include <snippets-rwdata.ld>
+
+        __data_end = .;
+    } GROUP_DATA_LINK_IN(RAMABLE_REGION, ROMABLE_REGION)
+    __data_size = __data_end - __data_start;
+    __data_load_start = LOADADDR(_DATA_SECTION_NAME);
+
+#include <snippets-ram-sections.ld>
 
 #include <zephyr/linker/common-ram.ld>
 #include <zephyr/linker/kobject-data.ld>
@@ -293,6 +296,35 @@ SECTIONS
 #include <zephyr/linker/ram-end.ld>
 
     GROUP_END(RAMABLE_REGION)
+
+#ifdef CONFIG_LINKER_USE_ONDEMAND_SECTION
+    . = z_mapped_end;
+    MMU_ALIGN;
+    lnkr_ondemand_start = .;
+
+    ONDEMAND_TEXT_SECTION_NAME (.) : AT(ADDR(_BSS_SECTION_NAME))
+    {
+        lnkr_ondemand_text_start = .;
+        *(.ondemand_text)
+        *(.ondemand_text.*)
+        MMU_ALIGN;
+        lnkr_ondemand_text_end = .;
+    } > ONDEMAND
+    lnkr_ondemand_text_size = SIZEOF(ONDEMAND_TEXT_SECTION_NAME);
+
+    ONDEMAND_RODATA_SECTION_NAME :
+    {
+        lnkr_ondemand_rodata_start = .;
+        *(.ondemand_rodata)
+        *(.ondemand_rodata.*)
+        MMU_ALIGN;
+        lnkr_ondemand_rodata_end = .;
+    } > ONDEMAND
+    lnkr_ondemand_rodata_size = SIZEOF(ONDEMAND_RODATA_SECTION_NAME);
+
+    lnkr_ondemand_end = .;
+    lnkr_ondemand_load_start = LOADADDR(ONDEMAND_TEXT_SECTION_NAME);
+#endif
 
 #include <zephyr/linker/debug-sections.ld>
 
