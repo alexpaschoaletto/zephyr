@@ -118,8 +118,10 @@ static void cbs_budget_timer_expired_callback(struct k_timer *timer){
     if(!timer) return;
     cbs_cycle_t now = cbs_get_now();   
     cbs_t *cbs = (cbs_t *) k_timer_user_data_get(timer);
+    k_sched_lock();
     cbs_replenish_due_to_run_out(cbs, now);
     k_thread_deadline_set(cbs->thread, (int) (cbs->abs_deadline - cbs->start_cycle));
+    k_sched_unlock();
     k_timer_start(timer, K_CYC((uint32_t) cbs->budget.current), K_NO_WAIT);
 }
 
@@ -293,7 +295,41 @@ int k_cbs_push_job(cbs_t *cbs, cbs_callback_t job_function, void *job_arg, k_tim
         cbs_budget_restore_if_condition(cbs);
         cbs->is_idle = false;
         k_sched_unlock();
+        if(k_can_yield()) k_yield();
     }
     
     return result;
 }
+
+
+/*
+    BACKUP
+
+int k_cbs_push_job(cbs_t *cbs, cbs_callback_t job_function, void *job_arg, k_timeout_t timeout){
+    cbs_job_t job = { job_function, job_arg };
+    
+    // Currently the deadline_set function is NOT
+    // a rescheduling point. That means no preemptions
+    // will happen if we call k_msg_q first and
+    // then deadline_set. That is unfortunate, since it
+    // was the logical and cleanest flow of things. 
+    
+    // this is the function prepared for the case
+    // the above doesn't work.
+
+    if (!cbs || k_msgq_num_free_get(cbs->queue) == 0) return -ENOMSG;    
+    
+    k_sched_lock();
+    cbs_budget_restore_if_condition(cbs);
+    int result = k_msgq_put(cbs->queue, &job, timeout);
+
+    if(result == 0){
+        #ifdef CONFIG_CBS_LOG
+        cbs_log(CBS_PUSH_JOB, cbs);
+        #endif
+        cbs->is_idle = false;
+    }
+    k_sched_unlock();
+    return result;
+}
+*/
