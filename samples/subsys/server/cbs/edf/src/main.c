@@ -12,44 +12,51 @@
 
 edf_t task1 = {
 	.id = 1,
+	.initial_delay_msec = 1000,
 	.rel_deadline_msec = 30,
 	.period_msec = 2000,
-	.wcet_msec = 5
+	.wcet_msec = 6
 };
 
 edf_t task2 = {
 	.id = 2,
-	.rel_deadline_msec = 14,
+	.initial_delay_msec = 1000,
+	.rel_deadline_msec = 20,
 	.period_msec = 6000,
+	.wcet_msec = 10
+};
+
+edf_t task3 = {
+	.id = 3,
+	.initial_delay_msec = 1000,
+	.rel_deadline_msec = 10,
+	.period_msec = 12000,
 	.wcet_msec = 1
 };
 
 
-void grow(edf_t *task, uint32_t amount){
-	// task->wcet_msec += amount;
-	task->rel_deadline_msec += amount;
-}
-
-
 void trigger(edf_t *task){
+	/*
+		the message itself is not relevant -
+		the *act* of sending the message is.
+		That's what unblocks the thread to
+		execute a cycle. However, the deadline
+		needs to be set BEFORE unblocking the
+		thread because the k_thread_deadline_set
+		is NOT a rescheduling point. Thus, it
+		will not trigger a preemption even if
+		it happens to be the earliest deadline.
+	*/
 	const char t = 1;
 	int deadline = MSEC_TO_CYC(task->rel_deadline_msec);
-	k_msgq_put(&task->queue, &t, K_NO_WAIT);
 	k_thread_deadline_set(task->thread, deadline);
+	k_msgq_put(&task->queue, &t, K_NO_WAIT);
 }
 
 
 void trigger_one(struct k_timer *timer){
 	edf_t *task = (edf_t *) k_timer_user_data_get(timer);
 	trigger(task);
-}
-
-
-void trigger_all(struct k_timer *timer){
-	printk(" \n");
-	trigger(&task1);
-	trigger(&task2);
-	grow(&task2, 5000);
 }
 
 
@@ -66,10 +73,10 @@ void thread_function(void *task_props, void *a2, void *a3){
 
 	k_thread_custom_data_set((void *) task);
 	k_msgq_init(&task->queue, buffer, sizeof(char), 10);
-	// k_timer_init(&task->timer, trigger_one, NULL);
-	// k_timer_user_data_set(&task->timer, (void *) task);
-	// k_timer_start(&task->timer, K_NO_WAIT, K_MSEC(task->period_msec));
-	printf("[ %d ] ready.\n", task->id);
+	k_timer_init(&task->timer, trigger_one, NULL);
+	k_timer_user_data_set(&task->timer, (void *) task);
+	k_timer_start(&task->timer, K_MSEC(task->initial_delay_msec), K_MSEC(task->period_msec));
+	printf("[ %d ] %d   \tready.\n", task->id, counter);
 
 	for(;;){
 		/*
@@ -78,14 +85,21 @@ void thread_function(void *task_props, void *a2, void *a3){
 			associated with it that regularly sends new
 			messages to the thread queue (e.g. every two
 			seconds).
+
+			This thread itself does nothing special. It
+			just remains in the processor for a given
+			amount of time ("busy wait") to emulate
+			the WCET (worst case execution time). Thus,
+			what we want to see with this example is
+			if the threads work alright
 		*/
 		k_msgq_get(&task->queue, &message, K_FOREVER);
 		start = k_cycle_get_64();
 		counter++;
-		deadline = task->thread->base.prio_deadline;
 		k_busy_wait(MSEC_TO_USEC(task->wcet_msec));
+		deadline = task->thread->base.prio_deadline;
 		end = k_cycle_get_64();
-		printk("[ %d ] %d\tstart %llu\t end %llu\t dead %d\n", task->id, counter, start, end, deadline);
+		printk("[ %d ] %d   \tstart %llu\t end %llu\t dead %d\n", task->id, counter, start, end, deadline);
 	}
 }
 
@@ -106,15 +120,20 @@ K_THREAD_DEFINE(
 );
 
 
-K_TIMER_DEFINE(master_timer, trigger_all, NULL);
+K_THREAD_DEFINE(
+	task3_thread, 2048,
+	thread_function,
+	&task3, NULL, NULL,
+	EDF_PRIORITY, 0, INACTIVE
+);
+
 
 int main(void){
 	k_sleep(K_SECONDS(1));
 	report_cbs_settings();
 	k_thread_start(task1_thread);
 	k_thread_start(task2_thread);
-
-	k_timer_start(&master_timer, K_SECONDS(3), K_SECONDS(3));
+	k_thread_start(task3_thread);
 	return 0;
 }
 
