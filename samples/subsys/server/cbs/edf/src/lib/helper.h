@@ -14,8 +14,10 @@
 #define MSEC_TO_CYC(msec)       k_ms_to_cyc_near32(msec)
 #define MSEC_TO_USEC(msec)      (msec * USEC_PER_MSEC)
 
+
 typedef struct {
-    int id;
+    char id;
+    int counter;
     int32_t initial_delay_msec;
     int32_t rel_deadline_msec;
     int32_t period_msec;
@@ -27,8 +29,9 @@ typedef struct {
 
 
 typedef struct {
-    char msg[100];
-    uint32_t counter;
+    char id;
+    int counter;
+    uint32_t wcet_msec;
 } job_t;
 
 
@@ -52,6 +55,5 @@ void report_cbs_settings(){
     #endif
     printf("\n//////////////////////////////////////////////////////////////////////////////////////\n\n");
 }
-
 
 #endif

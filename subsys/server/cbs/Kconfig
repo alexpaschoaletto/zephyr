@@ -16,7 +16,7 @@ menu "Constant Bandwidth Server (CBS)"
             to be selected (CONFIG_SCHED_DEADLINE=y).
     
     config CBS_LOG
-        bool "CBS event logs"
+        bool "CBS event logging"
         depends on CBS
         select LOG
         default n
@@ -25,6 +25,64 @@ menu "Constant Bandwidth Server (CBS)"
             such as jobs being pushed to the server, budget consumpion
             and CBS thread switching in/out of the CPU. This option
             requires CONFIG_CBS to be included within the project.
+
+        if CBS_LOG
+        menu "CBS events to be logged"
+
+            config CBS_LOG_JOB_PUSH
+                bool "J_PUSH log"
+                default y
+                help
+                    Enables logging of when
+                    a job is pushed to a CBS.
+
+            config CBS_LOG_JOB_COMPLETE
+                bool "J_COMP log"
+                default y
+                help
+                    Enables logging of when
+                    a job is completed.
+
+            config CBS_LOG_BUDGET_CONDITION
+                bool "B_COND log"
+                default y
+                help
+                    Enables logging of when
+                    the CBS condition gets met,
+                    causing the CBS deadline to
+                    be updated and the budget to
+                    be replenished.
+
+            config CBS_LOG_BUDGET_RAN_OUT
+                bool "B_ROUT log"
+                default y
+                help
+                    Enables logging of when
+                    the CBS budget runs out,
+                    causing the CBS deadline to
+                    be postponed and the budget to
+                    be replenished.
+
+            config CBS_LOG_SWITCHED_IN
+                bool "SWT_TO log"
+                default y
+                help
+                    Enables logging of when
+                    the CBS thread enters the
+                    CPU for execution of jobs.
+
+            config CBS_LOG_SWITCHED_OUT
+                bool "SWT_AY log"
+                default y
+                help
+                    Enables logging of when
+                    the CBS thread leaves the
+                    CPU after completing a job
+                    or being preempted by
+                    another thread.
+
+        endmenu
+        endif
 
     if CBS
     menu "CBS constants"
@@ -63,6 +121,7 @@ menu "Constant Bandwidth Server (CBS)"
                 it might chop a portion the server name on the aforementioned logs.
         
         endif
+
     endmenu
     endif
 
