@@ -9,100 +9,93 @@
 #include <zephyr/server/cbs.h>
 #include <string.h>
 #include "lib/helper.h"
+#include "lib/tracer.h"
 
 edf_t task1 = {
-	.id = 1,
-	.initial_delay_msec = 1000,
-	.rel_deadline_msec = 30,
-	.period_msec = 2000,
-	.wcet_msec = 6
+	.id = '1',
+	.counter = 0,
+	.initial_delay_msec = 0,
+	.rel_deadline_msec = 7000,
+	.period_msec = 7000,
+	.wcet_msec = 4000
 };
 
-edf_t task2 = {
-	.id = 2,
-	.initial_delay_msec = 1000,
-	.rel_deadline_msec = 20,
-	.period_msec = 6000,
-	.wcet_msec = 10
-};
-
-edf_t task3 = {
-	.id = 3,
-	.initial_delay_msec = 1000,
-	.rel_deadline_msec = 10,
-	.period_msec = 12000,
-	.wcet_msec = 1
+job_t job1 = {
+	.id = 'C',
+	.counter = 0,
+	.wcet_msec = 4000
 };
 
 
-void trigger(edf_t *task){
+void trigger(struct k_timer *timer){
 	/*
+		This function triggers a cycle for
+		the periodic EDF thread.
+
 		the message itself is not relevant -
 		the *act* of sending the message is.
 		That's what unblocks the thread to
-		execute a cycle. However, the deadline
-		needs to be set BEFORE unblocking the
-		thread because the k_thread_deadline_set
-		is NOT a rescheduling point. Thus, it
-		will not trigger a preemption even if
-		it happens to be the earliest deadline.
+		execute a cycle.
 	*/
 	const char t = 1;
+	edf_t *task = (edf_t *) k_timer_user_data_get(timer);
 	int deadline = MSEC_TO_CYC(task->rel_deadline_msec);
 	k_thread_deadline_set(task->thread, deadline);
 	k_msgq_put(&task->queue, &t, K_NO_WAIT);
+	trace(task->id, task->counter, TRIGGER);
 }
 
 
-void trigger_one(struct k_timer *timer){
-	edf_t *task = (edf_t *) k_timer_user_data_get(timer);
-	trigger(task);
+void cycle(char id, uint32_t wcet){
+	printf("[%c-", id);
+	k_busy_wait(wcet/10);
+	for(int i = 0; i < 9; i++){
+		printf("%c-", id);
+		k_busy_wait(wcet/10);
+	}
+	printf("%c]-", id);
+}
+
+
+void job_function(void *job_params){
+	job_t *job = (job_t *) job_params;
+	trace(job->id, job->counter, START);
+	uint32_t wcet = MSEC_TO_USEC(job->wcet_msec);
+	cycle(job->id, wcet);
+	trace(job->id, job->counter, END);
+	job->counter++;
 }
 
 
 void thread_function(void *task_props, void *a2, void *a3){
 	char buffer[10];
 	char message;
-	int counter = 0;
-	uint32_t deadline = 0;
-	uint64_t start = 0;
-	uint64_t end = 0;
 
 	edf_t *task = (edf_t *) task_props;
 	task->thread = k_current_get();
 
-	k_thread_custom_data_set((void *) task);
+	/* value passed to k_busy_wait needs to be in usec */
+	uint32_t wcet = MSEC_TO_USEC(task->wcet_msec);
+
 	k_msgq_init(&task->queue, buffer, sizeof(char), 10);
-	k_timer_init(&task->timer, trigger_one, NULL);
+	k_timer_init(&task->timer, trigger, NULL);
 	k_timer_user_data_set(&task->timer, (void *) task);
 	k_timer_start(&task->timer, K_MSEC(task->initial_delay_msec), K_MSEC(task->period_msec));
-	printf("[ %d ] %d   \tready.\n", task->id, counter);
 
 	for(;;){
-		/*
-			The periodic thread has no period, ironically.
-			What makes it periodic is that it has a timer
-			associated with it that regularly sends new
-			messages to the thread queue (e.g. every two
-			seconds).
-
-			This thread itself does nothing special. It
-			just remains in the processor for a given
-			amount of time ("busy wait") to emulate
-			the WCET (worst case execution time). Thus,
-			what we want to see with this example is
-			if the threads work alright
-		*/
 		k_msgq_get(&task->queue, &message, K_FOREVER);
-		start = k_cycle_get_64();
-		counter++;
-		k_busy_wait(MSEC_TO_USEC(task->wcet_msec));
-		deadline = task->thread->base.prio_deadline;
-		end = k_cycle_get_64();
-		printk("[ %d ] %d   \tstart %llu\t end %llu\t dead %d\n", task->id, counter, start, end, deadline);
+		trace(task->id, task->counter, START);
+		cycle(task->id, wcet);
+		trace(task->id, task->counter, END);
+		task->counter++;
 	}
 }
 
+K_TIMER_DEFINE(
+	trace_timer,
+	print_trace,
+	NULL
+);
 
 K_THREAD_DEFINE(
 	task1_thread, 2048,
@@ -112,43 +105,28 @@ K_THREAD_DEFINE(
 );
 
 
-K_THREAD_DEFINE(
-	task2_thread, 2048,
-	thread_function,
-	&task2, NULL, NULL,
-	EDF_PRIORITY, 0, INACTIVE
+K_CBS_DEFINE(
+	cbs_1,
+	K_MSEC(3500),
+	K_MSEC(8000),
+	EDF_PRIORITY
 );
 
-
-K_THREAD_DEFINE(
-	task3_thread, 2048,
-	thread_function,
-	&task3, NULL, NULL,
-	EDF_PRIORITY, 0, INACTIVE
-);
 
 
 int main(void){
 	k_sleep(K_SECONDS(1));
 	report_cbs_settings();
+
 	k_thread_start(task1_thread);
-	k_thread_start(task2_thread);
-	k_thread_start(task3_thread);
+	k_timer_start(&trace_timer, K_SECONDS(20), K_SECONDS(20));
+
+	k_sleep(K_MSEC(3000));
+	for(;;){
+		k_cbs_push_job(&cbs_1, job_function, &job1, K_FOREVER);
+		trace(job1.id, job1.counter, TRIGGER);
+		k_sleep(K_MSEC(10000));
+	}
+
 	return 0;
 }
-
-
-// void sys_trace_thread_switched_in_user(){                                     //should log every time the test thread enters the CPU
-// 	edf_t *task = (edf_t *) k_thread_custom_data_get();
-// 	if(!task) return;
-// 	int64_t cycle = k_cycle_get_64();
-// 	printk("[ %d ]\t in  %llu\n", task->id, cycle);
-// }
-
-
-// void sys_trace_thread_switched_out_user(){                                    //should log every time the test thread leaves the CPU
-//     edf_t *task = (edf_t *) k_thread_custom_data_get();
-// 	if(!task) return;
-// 	int64_t cycle = k_cycle_get_64();
-// 	printk("[ %d ]\t out %llu\n", task->id, cycle);
-// }

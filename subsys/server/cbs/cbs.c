@@ -14,9 +14,9 @@
 
 static cbs_cycle_t cbs_get_now(){
     /*
-        A wrapper for selecting what function
-        to call depending on the target processor
-        type, if 32 or 64 bits.
+        A wrapper for selecting what cycle
+        function to call depending on the
+        support for 32 or 64-bit timers.
     */
     #ifdef CONFIG_TIMER_HAS_64BIT_CYCLE_COUNTER
     return k_cycle_get_64();
@@ -28,19 +28,14 @@ static cbs_cycle_t cbs_get_now(){
 
 static void cbs_replenish_due_to_condition(cbs_t *cbs, cbs_cycle_t cycle){
     /*
-        if condition is met when a new job comes
-        to the server, this function is executed.
-
-        Note that, since this is called when a job
-        is pushed to the queue, it makes no sense
-        to recalculate the start cycle here (as
-        there is no guarantee the job will execute
-        immediately after being pushed).
+        if the budget replenishing condition is
+        met when a new job comes to the server,
+        this function is executed.
     */
     cbs->abs_deadline = cycle + cbs->period;
     cbs->budget.current = cbs->budget.max;
 
-    #ifdef CONFIG_CBS_LOG
+    #if defined(CONFIG_CBS_LOG) && defined(CONFIG_CBS_LOG_BUDGET_CONDITION)
     cbs_log(CBS_BUDGET_CONDITION_MET, cbs);
     #endif
 }
@@ -55,7 +50,7 @@ static void cbs_replenish_due_to_run_out(cbs_t *cbs, cbs_cycle_t cycle){
     cbs->abs_deadline += cbs->period;
     cbs->budget.current = cbs->budget.max;
 
-    #ifdef CONFIG_CBS_LOG
+    #if defined(CONFIG_CBS_LOG) && defined(CONFIG_CBS_LOG_BUDGET_RAN_OUT)
     cbs_log(CBS_BUDGET_RAN_OUT, cbs);
     #endif
 }
@@ -87,7 +82,7 @@ static void cbs_budget_update_consumption(cbs_t *cbs){
         relatively low and might result in many budget
         tracking inaccuracies depending on the types of
         jobs executed. It is therefore recommended to
-        have a 1us resolution or lower instead.
+        have a 100us resolution or lower instead.
     */
     cbs_cycle_t excess;
     if(budget_used > cbs->budget.max) {
@@ -103,8 +98,10 @@ static void cbs_budget_update_consumption(cbs_t *cbs){
     } else {
         excess = budget_used - cbs->budget.current;
     }
+    k_sched_lock();
     cbs_replenish_due_to_run_out(cbs, (now - excess));
     k_thread_deadline_set(cbs->thread, (int) (cbs->abs_deadline - cbs->start_cycle));
+    k_sched_unlock();
     cbs->budget.current -= excess;
 }
 
@@ -145,7 +142,6 @@ static void cbs_budget_restore_if_condition(cbs_t *cbs){
 
     cbs_cycle_t arrival = cbs_get_now();
     cbs_cycle_t deadline = cbs->abs_deadline;
-    // printk("%llu < %llu?\n", deadline, arrival);     //debug
     /*
         The CBS condition is that the server must
         be idle when a new job comes AND the
@@ -166,12 +162,12 @@ static void cbs_budget_restore_if_condition(cbs_t *cbs){
     */
     if(deadline > arrival){                                                         
         cbs_cycle_t budget = (cbs->budget.current << cbs->left_shift);
-        // printk("%llu << %u = %llu\n", cbs->budget.current, cbs->left_shift, budget);         //debug
-        // printk("%llu >= (%llu - %llu) * %llu ?\n", budget, deadline, arrival, cbs->bandwidth);   //debug
         if(budget < (deadline - arrival) * cbs->bandwidth) return;
     }
+    k_sched_lock();
     cbs_replenish_due_to_condition(cbs, arrival);
     k_thread_deadline_set(cbs->thread, (int) cbs->period);
+    k_sched_unlock();
 }
 
 
@@ -203,7 +199,7 @@ void cbs_thread(void *server_name, void *cbs_struct, void *cbs_args){
     cbs->abs_deadline = 0;
 
     /*
-        This for(;;) finds the highest left-shift value
+        This for loop finds the highest left-shift value
         we can apply to the budget before overflowing it.
 
         The actual left shift logical is done because the
@@ -212,7 +208,7 @@ void cbs_thread(void *server_name, void *cbs_struct, void *cbs_args){
         made here keeps the unsigned integer types of the
         variables involved for performance reasons. So
         the shift is applied in both sides of the equation
-        in an attempr to preserve the value resolution. 
+        in an attempt to preserve the value resolution. 
 
         more details in cbs_budget_restore_if_condition().
     */
@@ -247,7 +243,7 @@ void cbs_thread(void *server_name, void *cbs_struct, void *cbs_args){
         job.function(job.arg);
         cbs_budget_timer_stop(cbs);
 
-        #ifdef CONFIG_CBS_LOG
+        #if defined(CONFIG_CBS_LOG) && defined(CONFIG_CBS_LOG_JOB_COMPLETE)
         cbs_log(CBS_COMPLETED_JOB, cbs);
         #endif
 
@@ -262,8 +258,8 @@ void cbs_thread_switched_in(struct k_thread *thread){
     if(cbs->is_initialized && !cbs->is_idle){
         cbs_budget_timer_start(cbs);
     }
-    #ifdef CONFIG_CBS_LOG
-    cbs_log(CBS_SWITCH_TO, cbs);
+    #if defined(CONFIG_CBS_LOG) && defined(CONFIG_CBS_LOG_SWITCHED_IN)
+        cbs_log(CBS_SWITCH_TO, cbs);
     #endif
 }
 
@@ -271,11 +267,11 @@ void cbs_thread_switched_in(struct k_thread *thread){
 void cbs_thread_switched_out(struct k_thread *thread){
     if(!thread || !thread->cbs) return;
     cbs_t *cbs = (cbs_t *)thread->cbs;
-    if(cbs->is_initialized && cbs->is_idle){
+    if(cbs->is_initialized && !cbs->is_idle){
         cbs_budget_timer_stop(cbs);
     }
 
-    #ifdef CONFIG_CBS_LOG
+    #if defined(CONFIG_CBS_LOG) && defined(CONFIG_CBS_LOG_SWITCHED_OUT)
     cbs_log(CBS_SWITCH_AWAY, cbs);
     #endif
 }
@@ -288,48 +284,12 @@ int k_cbs_push_job(cbs_t *cbs, cbs_callback_t job_function, void *job_arg, k_tim
     int result = k_msgq_put(cbs->queue, &job, timeout);
     
     if(result == 0){
-        #ifdef CONFIG_CBS_LOG
+        #if defined(CONFIG_CBS_LOG) && defined(CONFIG_CBS_LOG_JOB_PUSH)
         cbs_log(CBS_PUSH_JOB, cbs);
         #endif
-        k_sched_lock();
         cbs_budget_restore_if_condition(cbs);
         cbs->is_idle = false;
-        k_sched_unlock();
-        if(k_can_yield()) k_yield();
     }
     
     return result;
 }
-
-
-/*
-    BACKUP
-
-int k_cbs_push_job(cbs_t *cbs, cbs_callback_t job_function, void *job_arg, k_timeout_t timeout){
-    cbs_job_t job = { job_function, job_arg };
-    
-    // Currently the deadline_set function is NOT
-    // a rescheduling point. That means no preemptions
-    // will happen if we call k_msg_q first and
-    // then deadline_set. That is unfortunate, since it
-    // was the logical and cleanest flow of things. 
-    
-    // this is the function prepared for the case
-    // the above doesn't work.
-
-    if (!cbs || k_msgq_num_free_get(cbs->queue) == 0) return -ENOMSG;    
-    
-    k_sched_lock();
-    cbs_budget_restore_if_condition(cbs);
-    int result = k_msgq_put(cbs->queue, &job, timeout);
-
-    if(result == 0){
-        #ifdef CONFIG_CBS_LOG
-        cbs_log(CBS_PUSH_JOB, cbs);
-        #endif
-        cbs->is_idle = false;
-    }
-    k_sched_unlock();
-    return result;
-}
-*/
