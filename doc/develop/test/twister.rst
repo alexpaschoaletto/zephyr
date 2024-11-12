@@ -341,6 +341,23 @@ extra_args: <list of extra arguments>
     Extra arguments to pass to build tool when building or running the
     test scenario.
 
+    Using namespacing, it is possible to apply extra_args only to some
+    hardware. Currently architectures/platforms/simulation are supported:
+
+    .. code-block:: yaml
+
+        common:
+          tags: drivers adc
+        tests:
+          test:
+            depends_on: adc
+          test_async:
+            extra_args:
+              - arch:x86:CONFIG_ADC_ASYNC=y
+              - platform:qemu_x86:CONFIG_DEBUG=y
+              - platform:mimxrt1060_evk:SHIELD=rk043fn66hs_ctg
+              - simulation:qemu:CONFIG_MPU=y
+
 extra_configs: <list of extra configurations>
     Extra configuration options to be merged with a main prj.conf
     when building or running the test scenario. For example:
@@ -398,11 +415,11 @@ levels: <list of levels>
     test will be selectable using the command line option ``--level <level name>``
 
 min_ram: <integer>
-    minimum amount of RAM in KB needed for this test to build and run. This is
+    estimated minimum amount of RAM in KB needed for this test to build and run. This is
     compared with information provided by the board metadata.
 
 min_flash: <integer>
-    minimum amount of ROM in KB needed for this test to build and run. This is
+    estimated minimum amount of ROM in KB needed for this test to build and run. This is
     compared with information provided by the board metadata.
 
 .. _twister_test_case_timeout:

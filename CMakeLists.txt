@@ -598,6 +598,8 @@ add_custom_command(
   COMMAND_EXPAND_LISTS
 )
 add_custom_target(version_h DEPENDS ${PROJECT_BINARY_DIR}/include/generated/zephyr/version.h)
+zephyr_get(KERNEL_VERSION_CUSTOMIZATION SYSBUILD LOCAL)
+set_property(TARGET version_h PROPERTY KERNEL_VERSION_CUSTOMIZATION ${KERNEL_VERSION_CUSTOMIZATION})
 
 if(EXISTS ${APPLICATION_SOURCE_DIR}/VERSION)
   add_custom_command(
@@ -616,6 +618,8 @@ if(EXISTS ${APPLICATION_SOURCE_DIR}/VERSION)
     app_version_h
     DEPENDS ${PROJECT_BINARY_DIR}/include/generated/zephyr/app_version.h)
   add_dependencies(zephyr_interface app_version_h)
+  zephyr_get(APP_VERSION_CUSTOMIZATION SYSBUILD LOCAL)
+  set_property(TARGET app_version_h PROPERTY APP_VERSION_CUSTOMIZATION ${APP_VERSION_CUSTOMIZATION})
 endif()
 
 # Unfortunately, the order in which CMakeLists.txt code is processed
@@ -2233,3 +2237,12 @@ add_subdirectory_ifdef(
   CONFIG_MAKEFILE_EXPORTS
   cmake/makefile_exports
   )
+
+toolchain_linker_finalize()
+
+yaml_context(EXISTS NAME build_info result)
+if(result)
+  build_info(zephyr version VALUE ${PROJECT_VERSION_STR})
+  build_info(zephyr zephyr-base VALUE ${ZEPHYR_BASE})
+  yaml_save(NAME build_info)
+endif()

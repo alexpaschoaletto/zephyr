@@ -262,7 +262,7 @@ static void eth_nxp_enet_iface_init(struct net_if *iface)
 #endif
 
 	ethernet_init(iface);
-	net_eth_carrier_off(data->iface);
+	net_if_carrier_off(data->iface);
 
 	config->irq_config_func();
 
@@ -855,7 +855,7 @@ static const struct ethernet_api api_funcs = {
 #define NXP_ENET_DT_PHY_DEV(node_id, phy_phandle, idx)						\
 	DEVICE_DT_GET(DT_PHANDLE_BY_IDX(node_id, phy_phandle, idx))
 
-#if DT_NODE_HAS_STATUS(DT_CHOSEN(zephyr_dtcm), okay) && \
+#if DT_NODE_HAS_STATUS_OKAY(DT_CHOSEN(zephyr_dtcm)) && \
 	CONFIG_ETH_NXP_ENET_USE_DTCM_FOR_DMA_BUFFER
 #define _nxp_enet_dma_desc_section __dtcm_bss_section
 #define _nxp_enet_dma_buffer_section __dtcm_noinit_section
