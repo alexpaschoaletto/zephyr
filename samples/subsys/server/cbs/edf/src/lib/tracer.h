@@ -8,12 +8,6 @@
 #define END             2 
 #define BUF_SIZE        100
 
-#ifdef CONFIG_CBS_LOG
-#define INITIAL_DELAY   CONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC
-#else
-#define INITIAL_DELAY   1000
-#endif
-
 /*
     This struct will hold execution
     metadata for the threads
@@ -56,7 +50,7 @@ void print_trace(){
     printk("\n========================\nEDF events:\n");
     char event[10];
     for(int i = 0; i < event_count; i++){
-        uint32_t timestamp = events[i].timestamp - INITIAL_DELAY;
+        uint32_t timestamp = events[i].timestamp;
         toString(events[i].event, event);
         printk("%u  \t[ %c ] %s %d\n", timestamp, events[i].thread_id, event, events[i].counter);
     }
@@ -67,11 +61,7 @@ void print_trace(){
 
 void trace(char thread_id, int thread_counter, int event){
     if(event_count >= BUF_SIZE) return;
-    #ifdef CONFIG_CBS_LOG
-    events[event_count].timestamp = k_cycle_get_32();
-    #else
     events[event_count].timestamp = k_uptime_get_32();
-    #endif
     events[event_count].thread_id = thread_id;
     events[event_count].counter = thread_counter;
     events[event_count].event = event;

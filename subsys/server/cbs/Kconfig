@@ -7,13 +7,13 @@ menu "Constant Bandwidth Server (CBS)"
 
     config CBS
         bool "Constant Bandwidth Server (CBS)"
-        depends on SCHED_DEADLINE
+        select SCHED_DEADLINE
         select INSTRUMENT_THREAD_SWITCHING
         default n
         help
-            Enables the Constant Bandwidth Server (CBS) to handle soft
-            real-time tasks. Depends on Earliest Deadline First (EDF)
-            to be selected (CONFIG_SCHED_DEADLINE=y).
+            Enables the Constant Bandwidth Server (CBS) to handle
+            soft real-time tasks. Selecting this option automatically
+            enables the Earliest Deadline First (EDF) scheduler. 
     
     config CBS_LOG
         bool "CBS event logging"
