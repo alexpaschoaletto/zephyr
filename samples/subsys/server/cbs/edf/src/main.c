@@ -2,8 +2,7 @@
  * Copyright (c) 2024 Instituto Superior de Engenharia do Porto (ISEP).
  *
  * SPDX-License-Identifier: Apache-2.0
-*/
-
+ */
 #include <zephyr/device.h>
 #include <zephyr/kernel.h>
 #include <zephyr/server/cbs.h>
@@ -11,23 +10,15 @@
 #include "lib/helper.h"
 #include "lib/tracer.h"
 
-edf_t task1 = {
-	.id = '1',
-	.counter = 0,
-	.initial_delay_msec = 0,
-	.rel_deadline_msec = 7000,
-	.period_msec = 7000,
-	.wcet_msec = 4000
-};
-
-job_t job1 = {
-	.id = 'C',
-	.counter = 0,
-	.wcet_msec = 4000
-};
+/*
+ * set EXAMPLE to 1 for a simple example of 1 EDF thread and 1 CBS.
+ * set EXAMPLE to 2 for a more complex example of 2 EDF threads and 1 CBS.
+*/
+#define EXAMPLE	2
 
 
-void trigger(struct k_timer *timer){
+void trigger(struct k_timer *timer)
+{
 	/*
 		This function triggers a cycle for
 		the periodic EDF thread.
@@ -46,7 +37,8 @@ void trigger(struct k_timer *timer){
 }
 
 
-void cycle(char id, uint32_t wcet){
+void cycle(char id, uint32_t wcet)
+{
 	printf("[%c-", id);
 	k_busy_wait(wcet/10);
 	for(int i = 0; i < 9; i++){
@@ -57,7 +49,8 @@ void cycle(char id, uint32_t wcet){
 }
 
 
-void job_function(void *job_params){
+void job_function(void *job_params)
+{
 	job_t *job = (job_t *) job_params;
 	trace(job->id, job->counter, START);
 	uint32_t wcet = MSEC_TO_USEC(job->wcet_msec);
@@ -67,7 +60,8 @@ void job_function(void *job_params){
 }
 
 
-void thread_function(void *task_props, void *a2, void *a3){
+void thread_function(void *task_props, void *a2, void *a3)
+{
 	char buffer[10];
 	char message;
 
@@ -91,42 +85,139 @@ void thread_function(void *task_props, void *a2, void *a3){
 	}
 }
 
-K_TIMER_DEFINE(
-	trace_timer,
-	print_trace,
-	NULL
-);
 
-K_THREAD_DEFINE(
-	task1_thread, 2048,
-	thread_function,
-	&task1, NULL, NULL,
-	EDF_PRIORITY, 0, INACTIVE
-);
+/****************************************************************************************************/
+#if EXAMPLE == 1 									/* this is the taskset if you choose example 1. */
 
+#define CBS_BUDGET 	K_MSEC(3000)
+#define CBS_PERIOD 	K_MSEC(8000)
 
-K_CBS_DEFINE(
-	cbs_1,
-	K_MSEC(3500),
-	K_MSEC(8000),
-	EDF_PRIORITY
-);
+edf_t tasks[] = {
+	{
+		.id = '1',
+		.counter = 0,
+		.initial_delay_msec = 0,
+		.rel_deadline_msec = 7000,
+		.period_msec = 7000,
+		.wcet_msec = 4000
+	}
+};
 
+job_t job1 = {
+	.id = 'C',
+	.counter = 0
+};
+
+K_THREAD_DEFINE(task1, 2048, thread_function, &tasks[0], NULL, NULL, EDF_PRIORITY, 0, INACTIVE);
+
+/****************************************************************************************************/
+#elif EXAMPLE == 2 									/* this is the taskset if you choose example 2. */
+
+#define CBS_BUDGET 	K_MSEC(2000)
+#define CBS_PERIOD 	K_MSEC(6000)
+
+edf_t tasks[] = {
+	{
+		.id = '1',
+		.counter = 0,
+		.initial_delay_msec = 0,
+		.rel_deadline_msec = 6000,
+		.period_msec = 6000,
+		.wcet_msec = 2000
+	},{
+		.id = '2',
+		.counter = 0,
+		.initial_delay_msec = 0,
+		.rel_deadline_msec = 9000,
+		.period_msec = 9000,
+		.wcet_msec = 3000
+	}
+};
+
+job_t job1 = {
+	.id = 'C',
+	.counter = 0
+};
+
+K_THREAD_DEFINE(task1, 2048, thread_function, &tasks[0], NULL, NULL, EDF_PRIORITY, 0, INACTIVE);
+K_THREAD_DEFINE(task2, 2048, thread_function, &tasks[1], NULL, NULL, EDF_PRIORITY, 0, INACTIVE);
+
+#endif
+/****************************************************************************************************/
+
+K_CBS_DEFINE(cbs_1, CBS_BUDGET, CBS_PERIOD, EDF_PRIORITY);
+K_TIMER_DEFINE(trace_timer, print_trace, NULL);
 
 
 int main(void){
 	k_sleep(K_SECONDS(1));
-	report_cbs_settings();
-
-	k_thread_start(task1_thread);
 	k_timer_start(&trace_timer, K_SECONDS(20), K_SECONDS(20));
 
+	report_cbs_settings();
+
+	#if EXAMPLE == 1
+	k_thread_start(task1);
+	/*
+	 * The CBS is most useful when a given code
+	 * needs to execute at arbitrary intervals
+	 * alongside a hard and periodic taskset.
+	 * To demonstrate that, in example 1, we:
+	 *
+	 * - wait 3 seconds;
+	 * - push a 4-second job;
+	 * - wait 10 seconds;
+	 * - push a 3-second job.
+	 *
+	 * So neither the execution time, nor the
+	 * arrival instant, nor the amount of jobs
+	 * are fixed to the eyes of the scheduler.
+	 * Thus, if we were to deal with this job
+	 * directly with EDF, it would be hard
+	 * to ensure a predictable execution.
+	 */
+	job1.wcet_msec = 4000;
 	k_sleep(K_MSEC(3000));
-	for(;;){
-		k_cbs_push_job(&cbs_1, job_function, &job1, K_FOREVER);
-		trace(job1.id, job1.counter, TRIGGER);
-		k_sleep(K_MSEC(10000));
-	}
+	k_cbs_push_job(&cbs_1, job_function, &job1, K_FOREVER);
+	trace(job1.id, job1.counter, TRIGGER);
+
+	job1.wcet_msec = 3000;
+	k_sleep(K_MSEC(10000));
+	k_cbs_push_job(&cbs_1, job_function, &job1, K_FOREVER);
+	trace(job1.id, job1.counter, TRIGGER);
+
+
+	#elif EXAMPLE == 2
+	k_thread_start(task1);
+	k_thread_start(task2);
+	/*
+	 * In example 2 we push the same job, but
+	 * at a slightly different timing:
+	 *
+	 * - wait 2 seconds;
+	 * - push a 3-second job;
+	 * - wait 10 seconds;
+	 * - push a 3-second job;
+	 * - wait 8 seconds;
+	 * - push a 1-second job.
+	 *
+	 * The values for both examples were
+	 * tailored to showcase the CBS behavior
+	 * under different circumstances.
+	 */
+	job1.wcet_msec = 3000;
+	k_sleep(K_MSEC(2000));
+	k_cbs_push_job(&cbs_1, job_function, &job1, K_FOREVER);
+	trace(job1.id, job1.counter, TRIGGER);
+
+	k_sleep(K_MSEC(10000));
+	k_cbs_push_job(&cbs_1, job_function, &job1, K_FOREVER);
+	trace(job1.id, job1.counter, TRIGGER);
+
+	job1.wcet_msec = 1000;
+	k_sleep(K_MSEC(8000));
+	k_cbs_push_job(&cbs_1, job_function, &job1, K_FOREVER);
+	trace(job1.id, job1.counter, TRIGGER);
+	#endif
 
 	return 0;
 }

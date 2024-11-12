@@ -12,7 +12,7 @@
 #endif
 
 
-static cbs_cycle_t cbs_get_now(){
+static inline cbs_cycle_t cbs_get_now(){
     /*
         A wrapper for selecting what cycle
         function to call depending on the
@@ -90,6 +90,8 @@ static void cbs_budget_update_consumption(cbs_t *cbs){
             Very edge case where the job surpassed
             the max allowed value for the budget
             itself one or more times in a row.
+            It is more likely to happen when the
+            tick resolution is too coarse (e.g. 1ms)
         */
         for(; budget_used > cbs->budget.max; budget_used -= cbs->budget.max){
             cbs_replenish_due_to_run_out(cbs, cbs->start_cycle + cbs->budget.max);
@@ -117,7 +119,7 @@ static void cbs_budget_timer_expired_callback(struct k_timer *timer){
     cbs_t *cbs = (cbs_t *) k_timer_user_data_get(timer);
     k_sched_lock();
     cbs_replenish_due_to_run_out(cbs, now);
-    k_thread_deadline_set(cbs->thread, (int) (cbs->abs_deadline - cbs->start_cycle));
+    k_thread_deadline_set(cbs->thread, (int) (cbs->abs_deadline - now));
     k_sched_unlock();
     k_timer_start(timer, K_CYC((uint32_t) cbs->budget.current), K_NO_WAIT);
 }
@@ -184,6 +186,31 @@ static void cbs_budget_timer_stop(cbs_t *cbs){
 }
 
 
+static inline void cbs_find_highest_shift_for(cbs_t *cbs){
+    /*
+        This for loop finds the highest left-shift value
+        we can apply to the budget before overflowing it.
+
+        The actual left shift logical is done because the
+        CBS condition checks an equation that, in paper,
+        uses decimal numbers within it. However, all math
+        made here keeps the unsigned integer types of the
+        variables involved for performance reasons. So
+        the shift is applied in both sides of the equation
+        in an attempt to preserve the value resolution.
+
+        more details in cbs_budget_restore_if_condition().
+    */
+    for(unsigned int right_shift = 1; right_shift < 32; right_shift++){
+        if((INT_MAX >> right_shift) < cbs->budget.max){
+            cbs->left_shift = right_shift - 1;
+            cbs->bandwidth = (cbs->budget.max << cbs->left_shift) / cbs->period;
+            break;
+        }
+    }
+}
+
+
 void cbs_thread(void *server_name, void *cbs_struct, void *cbs_args){
     cbs_job_t job;
     cbs_t *cbs = (cbs_t *) cbs_struct;
@@ -197,28 +224,7 @@ void cbs_thread(void *server_name, void *cbs_struct, void *cbs_args){
     cbs->budget.current = cbs->budget.max;
     cbs->left_shift = 0;
     cbs->abs_deadline = 0;
-
-    /*
-        This for loop finds the highest left-shift value
-        we can apply to the budget before overflowing it.
-
-        The actual left shift logical is done because the
-        CBS condition checks an equation that, in paper,
-        uses decimal numbers within it. However, all math
-        made here keeps the unsigned integer types of the
-        variables involved for performance reasons. So
-        the shift is applied in both sides of the equation
-        in an attempt to preserve the value resolution. 
-
-        more details in cbs_budget_restore_if_condition().
-    */
-    for(unsigned int right_shift = 1; right_shift < 32; right_shift++){
-        if((INT_MAX >> right_shift) < cbs->budget.max){
-            cbs->left_shift = right_shift - 1;
-            cbs->bandwidth = (cbs->budget.max << cbs->left_shift) / cbs->period;
-            break;
-        }
-    }
+    cbs_find_highest_shift_for(cbs);
     
     k_timer_init(cbs->timer, cbs_budget_timer_expired_callback, cbs_budget_timer_stop_callback);
     k_timer_user_data_set(cbs->timer, cbs);
