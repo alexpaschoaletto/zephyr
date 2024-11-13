@@ -35,6 +35,22 @@ typedef struct {
 } job_t;
 
 
+job_t *create_job(char id, int counter, uint32_t wcet_msec)
+{
+	job_t *job = (job_t *)k_malloc(sizeof(job_t));
+	job->id = id;
+	job->counter = counter;
+	job->wcet_msec = wcet_msec;
+	return job;
+}
+
+
+void destroy_job(job_t *job)
+{
+	k_free(job);
+}
+
+
 void report_cbs_settings(){
     printf("\n//////////////////////////////////////////////////////////////////////////////////////\n");
     printf("\nBoard:\t\t%s\n", CONFIG_BOARD_TARGET);

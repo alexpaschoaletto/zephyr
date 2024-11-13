@@ -19,13 +19,19 @@
 */
 #define EDF_PRIORITY 5
 
-typedef struct {
-    char msg[100];
-    uint32_t counter;
-} job_t;
 
-job_t job1 = { .msg = "[job]\t\tj1 on", .counter = 0 };
-job_t job2 = { .msg = "[job]\t\tj2 on", .counter = 0 };
+job_t *create_job(char *msg, int counter){
+	job_t *job = (job_t *)k_malloc(sizeof(job_t));
+	strcpy((char *)job->msg, msg);
+	job->counter = counter;
+	return job;
+}
+
+
+void destroy_job(job_t *job){
+	k_free(job);
+}
+
 
 /*
 	The CBS job must return void and receive a void*
@@ -72,15 +78,20 @@ K_CBS_DEFINE(cbs_1, K_MSEC(80), K_SECONDS(2), EDF_PRIORITY);
 int main(void){
 	k_sleep(K_SECONDS(2));
 	report_cbs_settings();
+
+	job_t *job1 = create_job("[job]\t\tj1 on", 0);
+	job_t *job2 = create_job("[job]\t\tj2 on", 0);
 	
 	for(;;){
 		printf("\n");
-        k_cbs_push_job(&cbs_1, job_function, &job1, K_NO_WAIT);
-        k_cbs_push_job(&cbs_1, job_function, &job1, K_NO_WAIT);
-        k_cbs_push_job(&cbs_1, job_function, &job1, K_NO_WAIT);
-		// k_cbs_push_job(&cbs_2, job_function, &job2, K_NO_WAIT);
+        k_cbs_push_job(&cbs_1, job_function, job1, K_NO_WAIT);
+        k_cbs_push_job(&cbs_1, job_function, job1, K_NO_WAIT);
+        k_cbs_push_job(&cbs_1, job_function, job1, K_NO_WAIT);
+		// k_cbs_push_job(&cbs_2, job_function, job2, K_NO_WAIT);
 		k_sleep(K_SECONDS(2));
 	}
 
+	destroy_job(job1);
+	destroy_job(job2);
 	return 0;
 }

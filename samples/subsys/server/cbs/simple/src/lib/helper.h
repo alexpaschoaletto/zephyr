@@ -1,6 +1,12 @@
 #ifndef _APP_HELPER_H_
 #define _APP_HELPER_H_
 
+typedef struct {
+    char msg[50];
+    uint32_t counter;
+} job_t;
+
+
 void report_cbs_settings(){
     printf("\n//////////////////////////////////////////////////////////////////////////////////////\n");
     printf("\nBoard:\t\t%s\n", CONFIG_BOARD_TARGET);
