@@ -14,7 +14,7 @@
  * set EXAMPLE to 1 for a simple example of 1 EDF thread and 1 CBS.
  * set EXAMPLE to 2 for a more complex example of 2 EDF threads and 1 CBS.
 */
-#define EXAMPLE	2
+#define EXAMPLE	1
 
 
 void trigger(struct k_timer *timer)
@@ -56,7 +56,6 @@ void job_function(void *job_params)
 	uint32_t wcet = MSEC_TO_USEC(job->wcet_msec);
 	cycle(job->id, wcet);
 	trace(job->id, job->counter, END);
-	job->counter++;
 }
 
 
@@ -103,11 +102,6 @@ edf_t tasks[] = {
 	}
 };
 
-job_t job1 = {
-	.id = 'C',
-	.counter = 0
-};
-
 K_THREAD_DEFINE(task1, 2048, thread_function, &tasks[0], NULL, NULL, EDF_PRIORITY, 0, INACTIVE);
 
 /****************************************************************************************************/
@@ -132,11 +126,6 @@ edf_t tasks[] = {
 		.period_msec = 9000,
 		.wcet_msec = 3000
 	}
-};
-
-job_t job1 = {
-	.id = 'C',
-	.counter = 0
 };
 
 K_THREAD_DEFINE(task1, 2048, thread_function, &tasks[0], NULL, NULL, EDF_PRIORITY, 0, INACTIVE);
@@ -175,16 +164,18 @@ int main(void){
 	 * directly with EDF, it would be hard
 	 * to ensure a predictable execution.
 	 */
-	job1.wcet_msec = 4000;
+	job_t *job1 = create_job('C', 0, 4000);
 	k_sleep(K_MSEC(3000));
-	k_cbs_push_job(&cbs_1, job_function, &job1, K_FOREVER);
-	trace(job1.id, job1.counter, TRIGGER);
+	k_cbs_push_job(&cbs_1, job_function, job1, K_FOREVER);
+	trace(job1->id, job1->counter, TRIGGER);
 
-	job1.wcet_msec = 3000;
+	job_t *job2 = create_job('C', 1, 3000);
 	k_sleep(K_MSEC(10000));
-	k_cbs_push_job(&cbs_1, job_function, &job1, K_FOREVER);
-	trace(job1.id, job1.counter, TRIGGER);
+	k_cbs_push_job(&cbs_1, job_function, job2, K_FOREVER);
+	trace(job2->id, job2->counter, TRIGGER);
 
+	destroy_job(job1);
+	destroy_job(job2);
 
 	#elif EXAMPLE == 2
 	k_thread_start(task1);
@@ -204,19 +195,24 @@ int main(void){
 	 * tailored to showcase the CBS behavior
 	 * under different circumstances.
 	 */
-	job1.wcet_msec = 3000;
+	job_t *job1 = create_job('C', 0, 3000);
 	k_sleep(K_MSEC(2000));
-	k_cbs_push_job(&cbs_1, job_function, &job1, K_FOREVER);
-	trace(job1.id, job1.counter, TRIGGER);
+	k_cbs_push_job(&cbs_1, job_function, job1, K_FOREVER);
+	trace(job1->id, job1->counter, TRIGGER);
 
+	job_t *job2 = create_job('C', 1, 3000);
 	k_sleep(K_MSEC(10000));
-	k_cbs_push_job(&cbs_1, job_function, &job1, K_FOREVER);
-	trace(job1.id, job1.counter, TRIGGER);
+	k_cbs_push_job(&cbs_1, job_function, job2, K_FOREVER);
+	trace(job2->id, job2->counter, TRIGGER);
 
-	job1.wcet_msec = 1000;
+	job_t *job3 = create_job('C', 2, 1000);
 	k_sleep(K_MSEC(8000));
-	k_cbs_push_job(&cbs_1, job_function, &job1, K_FOREVER);
-	trace(job1.id, job1.counter, TRIGGER);
+	k_cbs_push_job(&cbs_1, job_function, job3, K_FOREVER);
+	trace(job3->id, job3->counter, TRIGGER);
+	
+	destroy_job(job1);
+	destroy_job(job2);
+	destroy_job(job3);
 	#endif
 
 	return 0;

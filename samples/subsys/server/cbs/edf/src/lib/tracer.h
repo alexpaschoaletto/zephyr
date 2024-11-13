@@ -47,14 +47,14 @@ void reset_trace(){
 
 
 void print_trace(){
-    printk("\n========================\nEDF events:\n");
+    printf("\n========================\nEDF events:\n");
     char event[10];
     for(int i = 0; i < event_count; i++){
         uint32_t timestamp = events[i].timestamp;
         toString(events[i].event, event);
-        printk("%u  \t[ %c ] %s %d\n", timestamp, events[i].thread_id, event, events[i].counter);
+        printf("%u  \t[ %c ] %s %d\n", timestamp, events[i].thread_id, event, events[i].counter);
     }
-    printk("========================\n");
+    printf("========================\n");
     reset_trace();
 }
 
