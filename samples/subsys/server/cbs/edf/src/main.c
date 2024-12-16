@@ -16,6 +16,7 @@
 */
 #define EXAMPLE	1
 
+#define U 1000
 
 void trigger(struct k_timer *timer)
 {
@@ -74,7 +75,10 @@ void thread_function(void *task_props, void *a2, void *a3)
 	k_timer_init(&task->timer, trigger, NULL);
 	k_timer_user_data_set(&task->timer, (void *) task);
 	k_timer_start(&task->timer, K_MSEC(task->initial_delay_msec), K_MSEC(task->period_msec));
-
+	
+	/* allow other threads to set up */
+	// k_sleep(K_MSEC(1));
+	
 	for(;;){
 		k_msgq_get(&task->queue, &message, K_FOREVER);
 		trace(task->id, task->counter, START);
@@ -88,17 +92,17 @@ void thread_function(void *task_props, void *a2, void *a3)
 /****************************************************************************************************/
 #if EXAMPLE == 1 									/* this is the taskset if you choose example 1. */
 
-#define CBS_BUDGET 	K_MSEC(3000)
-#define CBS_PERIOD 	K_MSEC(8000)
+#define CBS_BUDGET 	K_MSEC(3*U)
+#define CBS_PERIOD 	K_MSEC(8*U)
 
 edf_t tasks[] = {
 	{
 		.id = '1',
 		.counter = 0,
 		.initial_delay_msec = 0,
-		.rel_deadline_msec = 7000,
-		.period_msec = 7000,
-		.wcet_msec = 4000
+		.rel_deadline_msec = 7*U,
+		.period_msec = 7*U,
+		.wcet_msec = 4*U
 	}
 };
 
@@ -107,24 +111,24 @@ K_THREAD_DEFINE(task1, 2048, thread_function, &tasks[0], NULL, NULL, EDF_PRIORIT
 /****************************************************************************************************/
 #elif EXAMPLE == 2 									/* this is the taskset if you choose example 2. */
 
-#define CBS_BUDGET 	K_MSEC(2000)
-#define CBS_PERIOD 	K_MSEC(6000)
+#define CBS_BUDGET 	K_MSEC(2*U)
+#define CBS_PERIOD 	K_MSEC(6*U)
 
 edf_t tasks[] = {
 	{
 		.id = '1',
 		.counter = 0,
 		.initial_delay_msec = 0,
-		.rel_deadline_msec = 6000,
-		.period_msec = 6000,
-		.wcet_msec = 2000
+		.rel_deadline_msec = 6*U,
+		.period_msec = 6*U,
+		.wcet_msec = 2*U
 	},{
 		.id = '2',
 		.counter = 0,
 		.initial_delay_msec = 0,
-		.rel_deadline_msec = 9000,
-		.period_msec = 9000,
-		.wcet_msec = 3000
+		.rel_deadline_msec = 9*U,
+		.period_msec = 9*U,
+		.wcet_msec = 3*U
 	}
 };
 
@@ -140,12 +144,13 @@ K_TIMER_DEFINE(trace_timer, print_trace, NULL);
 
 int main(void){
 	k_sleep(K_SECONDS(1));
-	k_timer_start(&trace_timer, K_SECONDS(20), K_SECONDS(20));
+	k_timer_start(&trace_timer, K_MSEC(30*U), K_MSEC(30*U));
 
 	report_cbs_settings();
 
 	#if EXAMPLE == 1
 	k_thread_start(task1);
+	start_tracing();
 	/*
 	 * The CBS is most useful when a given code
 	 * needs to execute at arbitrary intervals
@@ -164,13 +169,13 @@ int main(void){
 	 * directly with EDF, it would be hard
 	 * to ensure a predictable execution.
 	 */
-	job_t *job1 = create_job('C', 0, 4000);
-	k_sleep(K_MSEC(3000));
+	job_t *job1 = create_job('C', 0, 4*U);
+	k_sleep(K_MSEC(3*U));
 	k_cbs_push_job(&cbs_1, job_function, job1, K_FOREVER);
 	trace(job1->id, job1->counter, TRIGGER);
 
-	job_t *job2 = create_job('C', 1, 3000);
-	k_sleep(K_MSEC(10000));
+	job_t *job2 = create_job('C', 1, 3*U);
+	k_sleep(K_MSEC(10*U));
 	k_cbs_push_job(&cbs_1, job_function, job2, K_FOREVER);
 	trace(job2->id, job2->counter, TRIGGER);
 
@@ -180,6 +185,7 @@ int main(void){
 	#elif EXAMPLE == 2
 	k_thread_start(task1);
 	k_thread_start(task2);
+	start_tracing();
 	/*
 	 * In example 2 we push the same job, but
 	 * at a slightly different timing:
@@ -195,18 +201,18 @@ int main(void){
 	 * tailored to showcase the CBS behavior
 	 * under different circumstances.
 	 */
-	job_t *job1 = create_job('C', 0, 3000);
-	k_sleep(K_MSEC(2000));
+	job_t *job1 = create_job('C', 0, 3*U);
+	k_sleep(K_MSEC(2*U));
 	k_cbs_push_job(&cbs_1, job_function, job1, K_FOREVER);
 	trace(job1->id, job1->counter, TRIGGER);
 
-	job_t *job2 = create_job('C', 1, 3000);
-	k_sleep(K_MSEC(10000));
+	job_t *job2 = create_job('C', 1, 3*U);
+	k_sleep(K_MSEC(10*U));
 	k_cbs_push_job(&cbs_1, job_function, job2, K_FOREVER);
 	trace(job2->id, job2->counter, TRIGGER);
 
-	job_t *job3 = create_job('C', 2, 1000);
-	k_sleep(K_MSEC(8000));
+	job_t *job3 = create_job('C', 2, 1*U);
+	k_sleep(K_MSEC(8*U));
 	k_cbs_push_job(&cbs_1, job_function, job3, K_FOREVER);
 	trace(job3->id, job3->counter, TRIGGER);
 	

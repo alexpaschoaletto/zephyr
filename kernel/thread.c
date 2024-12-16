@@ -33,10 +33,6 @@
 #include <zephyr/llext/symbol.h>
 #include <zephyr/sys/iterable_sections.h>
 
-#ifdef CONFIG_CBS
-#include <zephyr/server/internal/cbs_internal.h>
-#endif	/* CONFIG_CBS */
-
 LOG_MODULE_DECLARE(os, CONFIG_KERNEL_LOG_LEVEL);
 
 #ifdef CONFIG_OBJ_CORE_THREAD
@@ -930,10 +926,6 @@ void z_thread_mark_switched_in(void)
 #ifdef CONFIG_TRACING
 	SYS_PORT_TRACING_FUNC(k_thread, switched_in);
 #endif /* CONFIG_TRACING */
-
-#ifdef CONFIG_CBS
-	cbs_thread_switched_in(_current);
-#endif /* CONFIG_CBS */
 }
 
 void z_thread_mark_switched_out(void)
@@ -951,10 +943,6 @@ void z_thread_mark_switched_out(void)
 #endif /* CONFIG_THREAD_LOCAL_STORAGE */
 	SYS_PORT_TRACING_FUNC(k_thread, switched_out);
 #endif /* CONFIG_TRACING */
-
-#ifdef CONFIG_CBS
-	cbs_thread_switched_out(_current);
-#endif /* CONFIG_CBS */
 }
 #endif /* CONFIG_INSTRUMENT_THREAD_SWITCHING */
 

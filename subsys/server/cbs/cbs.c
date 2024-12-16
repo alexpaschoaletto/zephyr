@@ -11,20 +11,16 @@
 #include <cbs_log.h>
 #endif
 
+#ifdef CONFIG_TIMER_HAS_64BIT_CYCLE_COUNTER
+#define cbs_get_now()   k_cycle_get_64()
+#else
+#define cbs_get_now()   k_cycle_get_32()
+#endif
 
-static inline cbs_cycle_t cbs_get_now(){
-    /*
-        A wrapper for selecting what cycle
-        function to call depending on the
-        support for 32 or 64-bit timers.
-    */
-    #ifdef CONFIG_TIMER_HAS_64BIT_CYCLE_COUNTER
-    return k_cycle_get_64();
-    #else
-    return k_cycle_get_32();
-    #endif
-}
+#define SWT_TO          5
+#define SWT_AWAY        6
 
+extern void trace(char thread_id, int thread_counter, int event);
 
 static void cbs_replenish_due_to_condition(cbs_t *cbs, cbs_cycle_t cycle){
     /*
@@ -34,6 +30,7 @@ static void cbs_replenish_due_to_condition(cbs_t *cbs, cbs_cycle_t cycle){
     */
     cbs->abs_deadline = cycle + cbs->period;
     cbs->budget.current = cbs->budget.max;
+    trace('C', -1, 3);
 
     #if defined(CONFIG_CBS_LOG) && defined(CONFIG_CBS_LOG_BUDGET_CONDITION)
     cbs_log(CBS_BUDGET_CONDITION_MET, cbs);
@@ -49,6 +46,7 @@ static void cbs_replenish_due_to_run_out(cbs_t *cbs, cbs_cycle_t cycle){
     cbs->start_cycle = cycle;
     cbs->abs_deadline += cbs->period;
     cbs->budget.current = cbs->budget.max;
+    trace('C', -1, 4);
 
     #if defined(CONFIG_CBS_LOG) && defined(CONFIG_CBS_LOG_BUDGET_RAN_OUT)
     cbs_log(CBS_BUDGET_RAN_OUT, cbs);
@@ -174,7 +172,7 @@ static void cbs_budget_restore_if_condition(cbs_t *cbs){
 
 
 static void cbs_budget_timer_start(cbs_t *cbs){
-    if(!cbs || !cbs->is_initialized) return;
+    if(cbs->start_cycle > 0) return;
     cbs->start_cycle = cbs_get_now();
     k_timer_start(cbs->timer, K_CYC((uint32_t) cbs->budget.current), K_NO_WAIT);
 }
@@ -260,8 +258,9 @@ void cbs_thread(void *server_name, void *cbs_struct, void *cbs_args){
 
 void cbs_thread_switched_in(struct k_thread *thread){
     if(!thread || !thread->cbs) return;
+    trace('C', -1, SWT_TO);
     cbs_t *cbs = (cbs_t *)thread->cbs;
-    if(cbs->is_initialized && !cbs->is_idle){
+    if(cbs->is_initialized && !cbs->is_idle){      
         cbs_budget_timer_start(cbs);
     }
     #if defined(CONFIG_CBS_LOG) && defined(CONFIG_CBS_LOG_SWITCHED_IN)
@@ -272,6 +271,7 @@ void cbs_thread_switched_in(struct k_thread *thread){
 
 void cbs_thread_switched_out(struct k_thread *thread){
     if(!thread || !thread->cbs) return;
+    trace('C', -1, SWT_AWAY);
     cbs_t *cbs = (cbs_t *)thread->cbs;
     if(cbs->is_initialized && !cbs->is_idle){
         cbs_budget_timer_stop(cbs);

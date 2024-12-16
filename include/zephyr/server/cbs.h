@@ -94,7 +94,7 @@ int k_cbs_push_job(cbs_t *cbs, cbs_callback_t job_function, void *job_arg, k_tim
  * algorithm - in Zephyr's case, that's EDF - enabling aperiodic tasks to be
  * served alongside the periodic ones.
  * 
- * These aperiodic tasks, also known as jobs, are usually event-driven and
+ * These aperiodic tasks are usually event-driven and
  * therefore have unkown arrival and execution times, which make them hard
  * to be directly scheduled under the EDF policy alone. The CBS then acts as
  * a wrapper, having its own deadline and period for schedulability analysis

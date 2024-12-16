@@ -11,6 +11,10 @@
 #include <zephyr/sys/barrier.h>
 #include <kernel_arch_func.h>
 
+#ifdef CONFIG_CBS
+#include <zephyr/server/internal/cbs_internal.h>
+#endif
+
 #ifdef CONFIG_STACK_SENTINEL
 extern void z_check_stack_sentinel(void);
 #else
@@ -132,9 +136,17 @@ static ALWAYS_INLINE unsigned int do_swap(unsigned int key,
 			z_smp_release_global_lock(new_thread);
 		}
 #endif /* CONFIG_SMP */
+		#ifdef CONFIG_CBS
+		cbs_thread_switched_out(old_thread);
+		#endif
+
 		z_thread_mark_switched_out();
 		z_sched_switch_spin(new_thread);
 		arch_current_thread_set(new_thread);
+
+		#ifdef CONFIG_CBS
+		cbs_thread_switched_in(new_thread);
+		#endif
 
 #ifdef CONFIG_TIMESLICING
 		z_reset_time_slice(new_thread);
@@ -165,6 +177,7 @@ static ALWAYS_INLINE unsigned int do_swap(unsigned int key,
 		}
 		k_spin_release(&_sched_spinlock);
 		arch_switch(newsh, &old_thread->switch_handle);
+
 	} else {
 		k_spin_release(&_sched_spinlock);
 	}

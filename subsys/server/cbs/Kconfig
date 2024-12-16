@@ -7,8 +7,8 @@ menu "Constant Bandwidth Server (CBS)"
 
     config CBS
         bool "Constant Bandwidth Server (CBS)"
+        depends on USE_SWITCH
         select SCHED_DEADLINE
-        select INSTRUMENT_THREAD_SWITCHING
         default n
         help
             Enables the Constant Bandwidth Server (CBS) to handle
