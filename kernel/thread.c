@@ -630,6 +630,9 @@ char *z_setup_new_thread(struct k_thread *new_thread,
 #ifdef CONFIG_SCHED_DEADLINE
 	new_thread->base.prio_deadline = 0;
 #endif /* CONFIG_SCHED_DEADLINE */
+#ifdef CONFIG_CBS
+	new_thread->cbs = NULL;
+#endif /* CONFIG_CBS */
 	new_thread->resource_pool = arch_current_thread()->resource_pool;
 
 #ifdef CONFIG_SMP
@@ -941,6 +944,7 @@ void z_thread_mark_switched_out(void)
 #endif /* CONFIG_TRACING */
 }
 #endif /* CONFIG_INSTRUMENT_THREAD_SWITCHING */
+
 
 int k_thread_runtime_stats_get(k_tid_t thread,
 			       k_thread_runtime_stats_t *stats)

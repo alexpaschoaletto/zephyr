@@ -22,6 +22,10 @@
 #include <zephyr/timing/timing.h>
 #include <zephyr/sys/util.h>
 
+#ifdef CONFIG_CBS
+#include <zephyr/sched_server/internal/cbs_internal.h>
+#endif
+
 LOG_MODULE_DECLARE(os, CONFIG_KERNEL_LOG_LEVEL);
 
 #if defined(CONFIG_SWAP_NONATOMIC) && defined(CONFIG_TIMESLICING)
@@ -835,8 +839,16 @@ struct k_thread *z_swap_next_thread(void)
 /* Just a wrapper around arch_current_thread_set(xxx) with tracing */
 static inline void set_current(struct k_thread *new_thread)
 {
+	#ifdef CONFIG_CBS
+	cbs_thread_switched_out(_current_cpu->current);
+	#endif /* CONFIG_CBS */
+
 	z_thread_mark_switched_out();
 	arch_current_thread_set(new_thread);
+
+	#ifdef CONFIG_CBS
+	cbs_thread_switched_in(new_thread);
+	#endif /* CONFIG_CBS */
 }
 
 /**
