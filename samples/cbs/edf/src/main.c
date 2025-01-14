@@ -44,13 +44,13 @@ void trigger(struct k_timer *timer)
 
 void cycle(char id, uint32_t wcet)
 {
-	printf("[%c-", id);
+	//printf("[%c-", id);
 	k_busy_wait(wcet / 10);
 	for (int i = 0; i < 8; i++) {
-		printf("%c-", id);
+		// printf("%c-", id);
 		k_busy_wait(wcet / 10);
 	}
-	printf("%c]-", id);
+	// printf("%c]-", id);
 	k_busy_wait(wcet / 10);
 }
 
@@ -61,7 +61,9 @@ void job_function(void *job_params)
 	trace(job->id, job->counter, START);
 	uint32_t wcet = MSEC_TO_USEC(job->wcet_msec);
 
-	cycle(job->id, wcet);
+	while(true){
+		cycle(job->id, wcet);
+	}
 	trace(job->id, job->counter, END);
 }
 
@@ -139,7 +141,7 @@ K_TIMER_DEFINE(trace_timer, print_trace, NULL);
 int main(void)
 {
 	k_sleep(K_SECONDS(1));
-	k_timer_start(&trace_timer, K_MSEC(20 * U), K_MSEC(20 * U));
+	// k_timer_start(&trace_timer, K_MSEC(20 * U), K_MSEC(20 * U));
 
 	report_cbs_settings();
 	begin_trace();
