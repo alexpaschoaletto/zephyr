@@ -187,6 +187,96 @@ int z_impl_k_msgq_put(struct k_msgq *msgq, const void *data, k_timeout_t timeout
 	return result;
 }
 
+int z_impl_k_msgq_put_urgent(struct k_msgq *msgq, const void *data, k_timeout_t timeout)
+{
+	__ASSERT(!arch_is_in_isr() || K_TIMEOUT_EQ(timeout, K_NO_WAIT), "");
+
+	struct k_thread *pending_thread;
+	k_spinlock_key_t key;
+	int result;
+	bool resched = false;
+
+	key = k_spin_lock(&msgq->lock);
+
+	SYS_PORT_TRACING_OBJ_FUNC_ENTER(k_msgq, put, msgq, timeout);
+
+	if (msgq->used_msgs < msgq->max_msgs) {
+		/* message queue isn't full */
+		pending_thread = z_unpend_first_thread(&msgq->wait_q);
+		if (unlikely(pending_thread != NULL)) {
+			resched = true;
+
+			/* give message to waiting thread */
+			(void)memcpy(pending_thread->base.swap_data, data, msgq->msg_size);
+			/* wake up waiting thread */
+			arch_thread_return_value_set(pending_thread, 0);
+			z_ready_thread(pending_thread);
+		} else {
+			/*
+			 * urgent put = write message to the head of the queue.
+			 * this is achieved in practice by simply:
+			 *
+			 * 1. decrementing the read pointer. This effectively
+			 * opens space for the incoming message in the head of
+			 * the queue.
+			 *
+			 * 2. temporarily matching the read pointer with the
+			 * write pointer. This way the message will be written
+			 * in the recently opened space.
+			 *
+			 * 3. reverting the write pointer after the write to its
+			 * original value. The read pointer, by its turn, should
+			 * be always at the head, so it doesn't need reverting
+			 * because we just wrote to the head.
+			 */
+			char *original_write_ptr = msgq->write_ptr;
+
+			/* decrement the read pointer */
+			msgq->read_ptr -= msgq->msg_size;
+			if (msgq->read_ptr < msgq->buffer_start) {
+				msgq->read_ptr = msgq->buffer_end - msgq->msg_size;
+			}
+
+			/* match read and write pointers */
+			msgq->write_ptr = msgq->read_ptr;
+
+			/* put message in queue */
+			__ASSERT_NO_MSG(msgq->write_ptr >= msgq->buffer_start &&
+					msgq->write_ptr < msgq->buffer_end);
+			(void)memcpy(msgq->write_ptr, (char *)data, msgq->msg_size);
+
+			/* revert write pointer to the original value */
+			msgq->write_ptr = original_write_ptr;
+			msgq->used_msgs++;
+
+			resched = handle_poll_events(msgq);
+		}
+		result = 0;
+	} else if (K_TIMEOUT_EQ(timeout, K_NO_WAIT)) {
+		/* don't wait for message space to become available */
+		result = -ENOMSG;
+	} else {
+		SYS_PORT_TRACING_OBJ_FUNC_BLOCKING(k_msgq, put, msgq, timeout);
+
+		/* wait for put message success, failure, or timeout */
+		_current->base.swap_data = (void *) data;
+
+		result = z_pend_curr(&msgq->lock, key, &msgq->wait_q, timeout);
+		SYS_PORT_TRACING_OBJ_FUNC_EXIT(k_msgq, put, msgq, timeout, result);
+		return result;
+	}
+
+	SYS_PORT_TRACING_OBJ_FUNC_EXIT(k_msgq, put, msgq, timeout, result);
+
+	if (resched) {
+		z_reschedule(&msgq->lock, key);
+	} else {
+		k_spin_unlock(&msgq->lock, key);
+	}
+
+	return result;
+}
+
 #ifdef CONFIG_USERSPACE
 static inline int z_vrfy_k_msgq_put(struct k_msgq *msgq, const void *data,
 				    k_timeout_t timeout)
@@ -195,6 +285,15 @@ static inline int z_vrfy_k_msgq_put(struct k_msgq *msgq, const void *data,
 	K_OOPS(K_SYSCALL_MEMORY_READ(data, msgq->msg_size));
 
 	return z_impl_k_msgq_put(msgq, data, timeout);
+}
+
+static inline int z_vrfy_k_msgq_put_urgent(struct k_msgq *msgq, const void *data,
+				    k_timeout_t timeout)
+{
+	K_OOPS(K_SYSCALL_OBJ(msgq, K_OBJ_MSGQ));
+	K_OOPS(K_SYSCALL_MEMORY_READ(data, msgq->msg_size));
+
+	return z_impl_k_msgq_put_urgent(msgq, data, timeout);
 }
 #include <zephyr/syscalls/k_msgq_put_mrsh.c>
 #endif /* CONFIG_USERSPACE */
