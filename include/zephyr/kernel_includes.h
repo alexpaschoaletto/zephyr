@@ -43,5 +43,6 @@
 #include <zephyr/app_memory/mem_domain.h>
 #include <zephyr/sys/kobject.h>
 #include <zephyr/kernel/thread.h>
+#include <zephyr/kernel/timer.h>
 
 #endif /* ZEPHYR_INCLUDE_KERNEL_INCLUDES_H_ */

@@ -92,6 +92,10 @@ kernel_sources_ifdef(CONFIG_MULTITHREADING
   pipe.c
   )
 
+kernel_sources_ifdef(CONFIG_SCHED_DEADLINE
+  deadline.c
+  )
+
 if(CONFIG_MULTITHREADING)
 if(CONFIG_SCHED_SCALABLE OR CONFIG_WAITQ_SCALABLE)
 kernel_sources(priority_queues.c)

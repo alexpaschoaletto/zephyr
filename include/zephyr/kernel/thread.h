@@ -14,6 +14,10 @@
 #include <zephyr/kernel/stats.h>
 #include <zephyr/arch/arch_interface.h>
 
+#ifdef CONFIG_SCHED_DEADLINE
+#include <zephyr/kernel/timer.h>
+#endif /* CONFIG_SCHED_DEADLINE */
+
 /**
  * @typedef k_thread_entry_t
  * @brief Thread entry point function type.
@@ -41,6 +45,10 @@ struct __thread_entry {
 #endif /* CONFIG_THREAD_MONITOR */
 
 struct k_thread;
+
+#ifdef CONFIG_SCHED_DEADLINE
+struct k_timer;
+#endif /* CONFIG_SCHED_DEADLINE */
 
 /* can be used for creating 'dummy' threads, e.g. for pending on objects */
 struct _thread_base {
@@ -91,6 +99,22 @@ struct _thread_base {
 
 #ifdef CONFIG_SCHED_DEADLINE
 	int prio_deadline;
+
+	/* Thread's period (optional) */
+	int64_t period;
+
+	/* True if period was changed during a cycle */
+	bool period_changed;
+
+	/* The period start tick (used for overrun calculations) */
+	int64_t activation_tick;
+
+	/* Deadline timer (optional) */
+	struct k_timer deadline_timer;
+
+	/* Callback invoked by the timer (optional) */
+	void (*deadline_miss_callback)(void *);
+
 #endif /* CONFIG_SCHED_DEADLINE */
 
 #if defined(CONFIG_SCHED_SCALABLE) || defined(CONFIG_WAITQ_SCALABLE)

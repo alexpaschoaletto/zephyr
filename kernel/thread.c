@@ -34,6 +34,10 @@
 
 LOG_MODULE_DECLARE(os, CONFIG_KERNEL_LOG_LEVEL);
 
+#ifdef CONFIG_SCHED_DEADLINE
+extern void z_deadline_timer_callback(struct k_timer *deadline_timer);
+#endif /* CONFIG_SCHED_DEADLINE */
+
 #ifdef CONFIG_OBJ_CORE_THREAD
 static struct k_obj_type  obj_type_thread;
 
@@ -704,6 +708,11 @@ char *z_setup_new_thread(struct k_thread *new_thread,
 #endif /* CONFIG_USERSPACE */
 #ifdef CONFIG_SCHED_DEADLINE
 	new_thread->base.prio_deadline = 0;
+	new_thread->base.period = 0;
+	new_thread->base.period_changed = false;
+	new_thread->base.activation_tick = 0;
+	new_thread->base.deadline_miss_callback = NULL;
+	k_timer_init(&(new_thread->base.deadline_timer), z_deadline_timer_callback, NULL);
 #endif /* CONFIG_SCHED_DEADLINE */
 	new_thread->resource_pool = _current->resource_pool;
 
