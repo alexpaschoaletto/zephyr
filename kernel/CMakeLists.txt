@@ -94,6 +94,8 @@ kernel_sources_ifdef(CONFIG_MULTITHREADING
 
 kernel_sources_ifdef(CONFIG_SCHED_DEADLINE
   deadline.c
+  deadline_tracer.c
+  deadline_tracer_overhead.c
   )
 
 if(CONFIG_MULTITHREADING)

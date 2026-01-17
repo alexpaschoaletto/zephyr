@@ -1105,6 +1105,21 @@ void k_thread_period_set(k_tid_t thread, k_timeout_t period);
 
 
 /**
+ * @brief Set an EDF thread's CBS budget.
+ *
+ * This routine optionally sets the CBS budget of a thread
+ * running under the EDF scheduling algorithm.
+ * 
+ * @note this is only a setter. The actual enforcement
+ * of the budget takes place in @a k_thread_deadline_set.
+ *
+ * @param tid ID of thread whose budget is to be set.
+ * @param budget New budget, in timeout units.
+ */
+void k_thread_cbs_budget_set(k_tid_t thread, k_timeout_t budget);
+
+
+/**
  * @brief Set an EDF thread's deadline miss callback.
  *
  * This routine optionally sets a callback function to be invoked

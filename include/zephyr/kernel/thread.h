@@ -16,6 +16,7 @@
 
 #ifdef CONFIG_SCHED_DEADLINE
 #include <zephyr/kernel/timer.h>
+#include <zephyr/kernel/deadline.h>
 #endif /* CONFIG_SCHED_DEADLINE */
 
 /**
@@ -114,6 +115,9 @@ struct _thread_base {
 
 	/* Callback invoked by the timer (optional) */
 	void (*deadline_miss_callback)(void *);
+
+	/* CBS-related metadata (optional, for bandwidth-regulated tasks) */
+	struct k_cbs cbs;
 
 #endif /* CONFIG_SCHED_DEADLINE */
 
