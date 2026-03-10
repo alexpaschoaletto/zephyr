@@ -1088,6 +1088,52 @@ __syscall void k_thread_priority_set(k_tid_t thread, int prio);
 
 
 #ifdef CONFIG_SCHED_DEADLINE
+
+/**
+ * @brief Set an EDF thread's period.
+ *
+ * This routine optionally sets the period of a thread running
+ * under the EDF scheduling algorithm.
+ * 
+ * @note this is only a setter. The actual enforcement
+ * of the period takes place in @a k_thread_deadline_set.
+ *
+ * @param tid ID of thread whose period is to be set.
+ * @param period New period, in timeout units.
+ */
+void k_thread_period_set(k_tid_t thread, k_timeout_t period);
+
+
+/**
+ * @brief Set an EDF thread's CBS budget.
+ *
+ * This routine optionally sets the CBS budget of a thread
+ * running under the EDF scheduling algorithm.
+ * 
+ * @note this is only a setter. The actual enforcement
+ * of the budget takes place in @a k_thread_deadline_set.
+ *
+ * @param tid ID of thread whose budget is to be set.
+ * @param budget New budget, in timeout units.
+ */
+void k_thread_cbs_budget_set(k_tid_t thread, k_timeout_t budget);
+
+
+/**
+ * @brief Set an EDF thread's deadline miss callback.
+ *
+ * This routine optionally sets a callback function to be invoked
+ * in the occasion an EDF thread misses its deadline.
+ * 
+ * @note this is only a setter. The deadlines only start counting
+ * when @a k_thread_deadline_set is called.
+ *
+ * @param tid ID of thread whose deadline miss callback is to be set.
+ * @param callback The new deadline miss callback.
+ */
+void k_thread_deadline_miss_callback_set(k_tid_t thread, void (* callback)(void *), void *callback_arg);
+
+
 /**
  * @brief Set relative deadline expiration time for scheduler
  *
@@ -1116,10 +1162,12 @@ __syscall void k_thread_priority_set(k_tid_t thread, int prio);
  * @kconfig_dep{CONFIG_SCHED_DEADLINE}
  *
  * @param thread A thread on which to set the deadline
- * @param deadline A time delta, in cycle units
- *
+ * @param deadline A time delta, in timeout units
+ * 
+ * @return 0 if no period configured, or period configured and the last cycle was successful.
+ * @return -1 if a period was configured and the last cycle had a period overflow.
  */
-__syscall void k_thread_deadline_set(k_tid_t thread, int deadline);
+__syscall int k_thread_deadline_set(k_tid_t thread, k_timeout_t deadline);
 
 /**
  * @brief Set absolute deadline expiration time for scheduler
@@ -1159,9 +1207,12 @@ __syscall void k_thread_deadline_set(k_tid_t thread, int deadline);
  * @kconfig_dep{CONFIG_SCHED_DEADLINE}
  *
  * @param thread A thread on which to set the deadline
- * @param deadline A timestamp, in cycle units
+ * @param deadline A timestamp, in timeout units
+ * 
+ * @return 0 if no period configured or period configured and the last cycle was successful.
+ * @return -1 if a period was configured and the last cycle had a period overflow.
  */
-__syscall void k_thread_absolute_deadline_set(k_tid_t thread, int deadline);
+__syscall int k_thread_absolute_deadline_set(k_tid_t thread, k_timeout_t deadline);
 #endif
 
 /**
@@ -1753,74 +1804,6 @@ const char *k_thread_state_str(k_tid_t thread_id, char *buf, size_t buf_size);
 
 /**
  * @}
- */
-
-/**
- * @brief Kernel timer structure
- *
- * This structure is used to represent a kernel timer.
- * All the members are internal and should not be accessed directly.
- */
-struct k_timer {
-	/**
-	 * @cond INTERNAL_HIDDEN
-	 */
-
-	/*
-	 * _timeout structure must be first here if we want to use
-	 * dynamic timer allocation. timeout.node is used in the double-linked
-	 * list of free timers
-	 */
-	struct _timeout timeout;
-
-	/* wait queue for the (single) thread waiting on this timer */
-	_wait_q_t wait_q;
-
-	/* runs in ISR context */
-	void (*expiry_fn)(struct k_timer *timer);
-
-	/* runs in the context of the thread that calls k_timer_stop() */
-	void (*stop_fn)(struct k_timer *timer);
-
-	/* timer period */
-	k_timeout_t period;
-
-	/* timer status */
-	uint32_t status;
-
-	/* user-specific data, also used to support legacy features */
-	void *user_data;
-
-	SYS_PORT_TRACING_TRACKING_FIELD(k_timer)
-
-#ifdef CONFIG_OBJ_CORE_TIMER
-	struct k_obj_core  obj_core;
-#endif
-	/**
-	 * INTERNAL_HIDDEN @endcond
-	 */
-};
-
-/**
- * @cond INTERNAL_HIDDEN
- */
-#define Z_TIMER_INITIALIZER(obj, expiry, stop) \
-	{ \
-	.timeout = { \
-		.node = {},\
-		.fn = z_timer_expiration_handler, \
-		.dticks = 0, \
-	}, \
-	.wait_q = Z_WAIT_Q_INIT(&obj.wait_q), \
-	.expiry_fn = expiry, \
-	.stop_fn = stop, \
-	.period = {}, \
-	.status = 0, \
-	.user_data = 0, \
-	}
-
-/**
- * INTERNAL_HIDDEN @endcond
  */
 
 /**

@@ -11,6 +11,10 @@
 #include <zephyr/sys/barrier.h>
 #include <kernel_arch_func.h>
 
+#if defined(CONFIG_SCHED_DEADLINE)
+#include <zephyr/kernel/deadline.h>
+#endif /* CONFIG_SCHED_DEADLINE */
+
 #ifdef CONFIG_STACK_SENTINEL
 extern void z_check_stack_sentinel(void);
 #else
@@ -130,10 +134,23 @@ static ALWAYS_INLINE unsigned int do_swap(unsigned int key,
 			z_smp_release_global_lock(new_thread);
 		}
 #endif /* CONFIG_SMP */
+
+#if defined(CONFIG_SCHED_DEADLINE)
+		if(HAS_CBS_ACTIVE(old_thread)) {
+			z_cbs_switched_out(&(old_thread->base.cbs));
+		}
+#endif /*CONFIG_SCHED_DEADLINE */
+
 		z_thread_mark_switched_out();
 		z_sched_switch_spin(new_thread);
 		z_current_thread_set(new_thread);
 
+#if defined(CONFIG_SCHED_DEADLINE)
+		if(HAS_CBS_ACTIVE(new_thread)) {
+			z_cbs_switched_in(&(new_thread->base.cbs));
+		}
+#endif /*CONFIG_SCHED_DEADLINE */
+		
 #ifdef CONFIG_TIMESLICING
 		z_reset_time_slice(new_thread);
 #endif /* CONFIG_TIMESLICING */

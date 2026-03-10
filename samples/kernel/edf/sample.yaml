@@ -1,0 +1,15 @@
+sample:
+  description: Earliest Deadline First (EDF) demo sample
+  name: edf
+common:
+  tags:
+    - edf
+tests:
+  sample.kernel.msgqueue:
+    integration_platforms:
+      - native_sim
+    harness: console
+    harness_config:
+      type: one_line
+      regex:
+        - ".*CBA012345"

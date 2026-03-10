@@ -32,7 +32,16 @@
 #include <zephyr/llext/symbol.h>
 #include <zephyr/sys/iterable_sections.h>
 
+#ifdef CONFIG_SCHED_DEADLINE
+#include <zephyr/kernel/deadline.h>
+#endif /* CONFIG_SCHED_DEADLINE */
+
 LOG_MODULE_DECLARE(os, CONFIG_KERNEL_LOG_LEVEL);
+
+#ifdef CONFIG_SCHED_DEADLINE
+extern void z_deadline_timer_callback(struct k_timer *deadline_timer);
+extern void z_cbs_timer_callback(struct k_timer *budget_timer);
+#endif /* CONFIG_SCHED_DEADLINE */
 
 #ifdef CONFIG_OBJ_CORE_THREAD
 static struct k_obj_type  obj_type_thread;
@@ -703,7 +712,21 @@ char *z_setup_new_thread(struct k_thread *new_thread,
 	}
 #endif /* CONFIG_USERSPACE */
 #ifdef CONFIG_SCHED_DEADLINE
+	/* general deadline-based scheduler configs */
 	new_thread->base.prio_deadline = 0;
+	new_thread->base.period = 0;
+	new_thread->base.period_changed = false;
+	new_thread->base.activation_tick = 0;
+	new_thread->base.deadline_miss_callback = NULL;
+	k_timer_init(&(new_thread->base.deadline_timer), z_deadline_timer_callback, NULL);
+	/* CBS-specific configs */
+	new_thread->base.cbs.thread = new_thread;
+    new_thread->base.cbs.relative_deadline = 0;
+    new_thread->base.cbs.current_budget = 0;
+    new_thread->base.cbs.max_budget = 0;
+    new_thread->base.cbs.start_tick = 0;
+    new_thread->base.cbs.is_active = false;
+	k_timer_init(&(new_thread->base.cbs.budget_timer), z_cbs_timer_callback, NULL);
 #endif /* CONFIG_SCHED_DEADLINE */
 	new_thread->resource_pool = _current->resource_pool;
 
@@ -1127,6 +1150,12 @@ void z_thread_mark_switched_in(void)
 	z_sched_usage_start(_current);
 #endif /* CONFIG_SCHED_THREAD_USAGE && !CONFIG_USE_SWITCH */
 
+#if defined(CONFIG_SCHED_DEADLINE) && !defined(CONFIG_USE_SWITCH)
+	if(HAS_CBS_ACTIVE(_current)) {
+		z_cbs_switched_in(&(_current->base.cbs));
+	}
+#endif /*CONFIG_SCHED_DEADLINE && !CONFIG_USE_SWITCH */
+
 #ifdef CONFIG_TRACING
 	SYS_PORT_TRACING_FUNC(k_thread, switched_in);
 #endif /* CONFIG_TRACING */
@@ -1137,6 +1166,12 @@ void z_thread_mark_switched_out(void)
 #if defined(CONFIG_SCHED_THREAD_USAGE) && !defined(CONFIG_USE_SWITCH)
 	z_sched_usage_stop();
 #endif /*CONFIG_SCHED_THREAD_USAGE && !CONFIG_USE_SWITCH */
+
+#if defined(CONFIG_SCHED_DEADLINE) && !defined(CONFIG_USE_SWITCH)
+	if(HAS_CBS_ACTIVE(_current)) {
+		z_cbs_switched_out(&(_current->base.cbs));
+	}
+#endif /*CONFIG_SCHED_DEADLINE && !CONFIG_USE_SWITCH */
 
 #ifdef CONFIG_TRACING
 #ifdef CONFIG_THREAD_LOCAL_STORAGE
